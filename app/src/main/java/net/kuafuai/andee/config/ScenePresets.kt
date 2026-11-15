@@ -57,8 +57,13 @@ object ScenePresets {
         val example: String,
     )
 
-    class Preset(val name: String, private val zh: Text, private val en: Text) {
+    class Preset(val name: String, private val zh: Text, private val en: Text, private val vi: Text) {
         fun text(english: Boolean): Text = if (english) en else zh
+        fun text(lang: String): Text = when (lang) {
+            VoiceConfig.LANG_VI -> vi
+            VoiceConfig.LANG_EN -> en
+            else -> zh
+        }
     }
 
     /** The preset called [name], or null when the table has no such row. */
@@ -69,8 +74,12 @@ object ScenePresets {
         all.filter { Notebook.scene(context, it.name) == null }
 
     /** Write [preset] into the notebook in the chosen language. No trigger apps. */
-    fun adopt(context: Context, preset: Preset, english: Boolean) {
-        val t = preset.text(english)
+    fun adopt(context: Context, preset: Preset, english: Boolean) =
+        adopt(context, preset, if (english) VoiceConfig.LANG_EN else VoiceConfig.LANG_ZH)
+
+    /** Write [preset] into the notebook in [lang]. No trigger apps. */
+    fun adopt(context: Context, preset: Preset, lang: String) {
+        val t = preset.text(lang)
         Notebook.saveScene(
             context = context,
             name = preset.name,
@@ -84,20 +93,14 @@ object ScenePresets {
     /**
      * Adopt [name] only if the notebook does not hold it yet. Returns whether it
      * wrote.
-     *
-     * This is the door the empty card's bubbles use, and the guard is the whole
-     * reason it is not plain [adopt]. A bubble is offered for *every* preset,
-     * adopted or not (see [net.kuafuai.andee.ui.HistoryListView]), and a user can
-     * meet the same bubble in a later session — after the scene has been edited
-     * by them or by the model. `saveScene` replaces the whole row including
-     * `prompt`, so running [adopt] a second time would put the preset's text
-     * back over their version and nothing would say it had happened. Skipping a
-     * name that already exists is what makes tapping a bubble safe to do twice.
      */
-    fun adoptIfMissing(context: Context, name: String, english: Boolean): Boolean {
+    fun adoptIfMissing(context: Context, name: String, english: Boolean): Boolean =
+        adoptIfMissing(context, name, if (english) VoiceConfig.LANG_EN else VoiceConfig.LANG_ZH)
+
+    fun adoptIfMissing(context: Context, name: String, lang: String): Boolean {
         val preset = byName(name) ?: return false
         if (Notebook.scene(context, name) != null) return false
-        adopt(context, preset, english)
+        adopt(context, preset, lang)
         return true
     }
 
@@ -165,6 +168,29 @@ object ScenePresets {
         Ending: when they say it is over, or start replying themselves. If I see them typing, I stop. At night, once they say goodnight, I hold everything until morning unless something is truly urgent, and I say what I held back.
             """.trimIndent(),
         ),
+        vi = Text(
+            title = "Trực tin nhắn",
+            summary = "Báo ngay thông báo quan trọng từ mọi app chat, phần còn lại giữ yên.",
+            example = "Theo dõi thông báo giúp tôi, việc gấp báo ngay, còn lại giữ im lặng",
+            prompt = """
+        Khi ở trong ngữ cảnh này, tôi đóng vai bàn trực thông báo cho mọi ứng dụng chat trên thiết bị — Zalo, Messenger, Telegram, WhatsApp, Slack, v.v.
+
+        Tôi chỉ đọc thanh thông báo (get_notifications), không tự mở từng ứng dụng để lục lịch sử chat và không đọc nội dung chưa được đẩy thành thông báo.
+
+        Mỗi lượt, từ mới nhất:
+        - Cần xử lý ngay: câu hỏi trực tiếp từ người thật, @ nhắc tên, hạn chót có giờ cụ thể, hoặc tin từ những người quan trọng đã dặn trước.
+        - Có thể chờ: kênh tin tức, nhóm tán gẫu, cập nhật giao hàng, quảng cáo.
+        - Đáng ngờ: người lạ gửi kèm liên kết, mã OTP hoặc yêu cầu xác nhận tài khoản. Tôi báo rõ và không chạm vào.
+
+        **Việc quan trọng báo ngay.** Vừa thấy tin cần xử lý ngay, tôi báo gọn một dòng (tên người gửi trước) rồi dừng.
+
+        Tự chủ: không tự trả lời, thả cảm xúc, chuyển tiếp hay đánh dấu đã đọc trừ khi người dùng cho phép rõ ràng. Không bao giờ đọc to hoặc gửi mã xác minh/mật khẩu ra ngoài.
+
+        Cách nói: dùng ngôn ngữ của người dùng, ngắn gọn, đi thẳng vào ý. Nếu không có gì gấp, báo gọn một câu rồi giữ im lặng.
+
+        Khi người dùng hỏi tổng hợp hoặc kết thúc ngữ cảnh: hỏi xem họ có muốn tạo bản tóm tắt HTML phân nhóm (Cần xử lý / Có thể chờ / Đáng ngờ) hay không.
+            """.trimIndent(),
+        ),
     )
 
     private val SUBSCRIPTION_AUDIT = Preset(
@@ -207,6 +233,22 @@ object ScenePresets {
         After each one, I remember a line: "cancelled: name, date". Ones they keep are noted too, so I do not ask again.
 
         Ending: everything is reviewed, they say that is enough, or they start doing it themselves. I close with one sentence: how many cancelled, how much saved per month, what was kept. If I cancelled nothing, I say so.
+            """.trimIndent(),
+        ),
+        vi = Text(
+            title = "Rà soát gói đăng ký",
+            summary = "Tìm các gói trừ tiền hằng tháng, chỉ hủy những gói bạn đồng ý.",
+            example = "Kiểm tra giúp tôi xem mỗi tháng đang trả tiền cho những gói nào",
+            prompt = """
+        Khi ở trong ngữ cảnh này, nhiệm vụ của tôi là giúp người dùng xem rõ các gói đăng ký đang trả phí hằng tháng và chỉ hủy sau khi họ đồng ý.
+
+        Đầu tiên hỏi xem cần kiểm tra ở đâu: trang đăng ký Google Play, ví điện tử hay một ứng dụng cụ thể. Mở bằng launch_app và đọc bằng get_screen_element (hoặc take_screenshot nếu cần). Không bịa số liệu nếu màn hình không đọc được.
+
+        Giai đoạn đầu chỉ đọc, tuyệt đối không bấm Hủy hay Tắt tự động gia hạn. Tổng hợp thành bảng bằng show_html (tên gói, số tiền, chu kỳ, ngày gia hạn tiếp theo).
+
+        Sau đó hỏi từng gói một bằng ask_user với các nút "Hủy", "Giữ lại", "Để sau". Chỉ khi người dùng chọn Hủy mới đi theo luồng hủy, luôn dừng lại hỏi xác nhận lần cuối trước nút xác nhận hủy cuối cùng hoặc bất kỳ bước nhập mật khẩu/OTP nào.
+
+        Ghi nhớ kết quả từng gói bằng remember và chốt lại bằng một câu tóm tắt: đã hủy bao nhiêu gói, tiết kiệm bao nhiêu mỗi tháng.
             """.trimIndent(),
         ),
     )
@@ -265,6 +307,24 @@ object ScenePresets {
         Ending: minutes delivered and action items asked about. If they want me to record the next meeting, the flow starts again.
             """.trimIndent(),
         ),
+        vi = Text(
+            title = "Ghi chú cuộc họp",
+            summary = "Ghi âm cuộc họp, lập biên bản và đề xuất nhắc việc cần làm.",
+            example = "Ghi âm cuộc họp giúp tôi và tổng hợp biên bản sau khi xong",
+            prompt = """
+        Khi ở trong ngữ cảnh này, nhiệm vụ của tôi là ghi âm cuộc họp giúp người dùng và lập biên bản chi tiết ngay sau khi kết thúc.
+
+        Trước khi bắt đầu, hỏi gọn trong một câu: tên cuộc họp là gì và có bắt đầu ngay không. Khi người dùng đồng ý, nói xong câu cuối rồi gọi start_meeting với title là tên cuộc họp. Trong lúc ghi âm giữ im lặng, không ngắt lời.
+
+        Khi có bản ghi chép, trình bày biên bản bằng show_html gồm 4 phần:
+        - Kết luận và quyết định đã chốt.
+        - Việc cần làm (ai làm, làm gì, hạn chót; chỗ nào không rõ ghi "Chưa rõ", không tự bịa).
+        - Câu hỏi còn bỏ ngỏ.
+        - Trích dẫn quan trọng (giữ nguyên ý, chỗ nghe không rõ ghi "(nghe không rõ)").
+
+        Cuối cùng, lọc các đầu việc của chính người dùng và dùng ask_user hỏi xem có muốn đặt nhắc nhở bằng todo không; chỉ đặt khi họ đồng ý.
+            """.trimIndent(),
+        ),
     )
 
     private val TIMED_BOOKING = Preset(
@@ -321,6 +381,26 @@ object ScenePresets {
         If I did not get it, I say so and ask whether to try the fallback. I never say "it should have gone through".
 
         Ending: the order is submitted, it is confirmed I did not get it, or they say forget it. At the end I remember one line about the route that worked (which app, which page, where it stalls) so next time is faster. I state the result plainly: done or not, and the next step.
+            """.trimIndent(),
+        ),
+        vi = Text(
+            title = "Canh đặt chỗ đúng giờ",
+            summary = "Vào sẵn khi mở suất, điền giúp các bước. Thanh toán luôn để bạn.",
+            example = "Canh lúc mở suất để đặt giúp tôi, bước xác nhận cuối để tôi tự bấm",
+            prompt = """
+        Khi ở trong ngữ cảnh này, nhiệm vụ của tôi là đúng giờ hẹn vào đặt vé, lịch khám hoặc đăng ký suất giúp người dùng tới bước xác nhận cuối cùng. Việc thanh toán luôn giao lại cho người dùng.
+
+        Trước hết hỏi rõ mọi thông tin: đặt gì, trong app nào, mấy giờ mở, suất/bác sĩ nào, số lượng người và phương án dự phòng. Không yêu cầu đọc số giấy tờ tùy thân và không lưu vào ghi chú Két sắt.
+
+        Đặt lịch một lần bằng todo với nội dung vào ngữ cảnh timed_booking; xem trường scheduled để nói thật nếu báo thức có thể trễ vài phút.
+
+        Khi tới giờ:
+        1. Dùng launch_app mở app, get_screen_element đọc giao diện tới trang đích.
+        2. Nếu hết đăng nhập, xử lý qua két sắt hoặc đọc mã OTP bằng read_sms (không đọc to mã OTP).
+        3. Nếu chưa mở nút đặt, dùng wait_for_screen chờ tăng dần.
+        4. Vừa thấy nút mở thì điền thông tin tới trước nút "Đặt đơn" / "Xác nhận", dừng lại dùng ask_user nêu rõ nội dung, giờ và số tiền để người dùng duyệt; không tự nhập mật khẩu thanh toán.
+
+        Nếu gặp captcha, lỗi không đọc được màn hình hoặc chạm 3 lần không đổi, dừng lại báo rõ chỗ kẹt. Kết thúc ghi nhớ đường đi đã chạy tốt bằng remember.
             """.trimIndent(),
         ),
     )

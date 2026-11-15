@@ -214,7 +214,7 @@ class ScenesUi(
     private fun addPresets(body: LinearLayout) {
         val left = ScenePresets.notAdopted(context)
         if (left.isEmpty()) return
-        val english = VoiceConfig.uiLanguage(context) == VoiceConfig.LANG_EN
+        val lang = VoiceConfig.uiLanguage(context)
         body.addView(
             TextView(context).apply {
                 text = lctx.getString(R.string.scenes_presets_title)
@@ -234,7 +234,7 @@ class ScenesUi(
             matchWrap(),
         )
         for (p in left) {
-            val t = p.text(english)
+            val t = p.text(lang)
             val row = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(14), dp(12), dp(14), dp(12))
@@ -253,7 +253,7 @@ class ScenesUi(
             }, matchWrap())
             row.addView(
                 action(lctx.getString(R.string.scenes_preset_adopt), Glass.ACCENT) {
-                    ScenePresets.adopt(context, p, english)
+                    ScenePresets.adopt(context, p, lang)
                     rebuild()
                 },
             )

@@ -529,8 +529,7 @@ class BodyCoreService : Service() {
                 net.kuafuai.andee.config.ScenePresets.adoptIfMissing(
                     this@BodyCoreService,
                     name,
-                    net.kuafuai.andee.config.VoiceConfig.uiLanguage(this@BodyCoreService) ==
-                        net.kuafuai.andee.config.VoiceConfig.LANG_EN,
+                    net.kuafuai.andee.config.VoiceConfig.uiLanguage(this@BodyCoreService),
                 )
                 submitUserTurn(
                     AppLocale.str(this@BodyCoreService, R.string.suggestion_turn, title, example),

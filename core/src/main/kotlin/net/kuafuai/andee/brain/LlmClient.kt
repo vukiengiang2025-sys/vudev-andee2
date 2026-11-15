@@ -154,12 +154,10 @@ class LlmClient(
         val cachedTokens: Int,
     )
 
-    /**
-     * @param messages the full conversation, system message first.
-     * @param tools OpenAI-format function specs — see [toolSpecs].
-     * @param noThinking ask without reasoning whatever the user's setting is.
-     */
-    fun complete(messages: List<JSONObject>, tools: JSONArray, noThinking: Boolean = false): Reply {
+    private val isDeepSeek: Boolean
+        get() = baseUrl.contains("deepseek.com", ignoreCase = true)
+
+    internal fun buildRequestBody(messages: List<JSONObject>, tools: JSONArray, noThinking: Boolean = false): JSONObject {
         val msgArr = JSONArray()
         for (m in messages) msgArr.put(m)
         val body = JSONObject()
@@ -171,13 +169,26 @@ class LlmClient(
         }
         if (thinking && !noThinking) {
             body.put("thinking", JSONObject().put("type", "enabled"))
-            body.put("reasoning_effort", reasoningEffort)
-        } else {
+            if (!isDeepSeek) {
+                body.put("reasoning_effort", reasoningEffort)
+            }
+        } else if (!isDeepSeek || !model.contains("reasoner", ignoreCase = true)) {
             body.put("thinking", JSONObject().put("type", "disabled"))
         }
+        return body
+    }
+
+    /**
+     * @param messages the full conversation, system message first.
+     * @param tools OpenAI-format function specs — see [toolSpecs].
+     * @param noThinking ask without reasoning whatever the user's setting is.
+     */
+    fun complete(messages: List<JSONObject>, tools: JSONArray, noThinking: Boolean = false): Reply {
+        val body = buildRequestBody(messages, tools, noThinking)
+        val endpoint = "${baseUrl.trimEnd('/')}/chat/completions"
 
         val req = Request.Builder()
-            .url("$baseUrl/chat/completions")
+            .url(endpoint)
             .addHeader("Authorization", "Bearer $apiKey")
             .addHeader("Content-Type", "application/json")
             .post(body.toString().toRequestBody(JSON))
@@ -263,7 +274,7 @@ class LlmClient(
         runCatching { c.cancel() }
     }
 
-    private fun sanitizeAssistant(msg: JSONObject): JSONObject {
+    internal fun sanitizeAssistant(msg: JSONObject): JSONObject {
         val out = JSONObject()
         out.put("role", "assistant")
         // JSONObject.NULL rather than omitting the key: the API expects
@@ -271,6 +282,11 @@ class LlmClient(
         // turn was tool calls.
         val content = msg.optString("content").orEmpty()
         out.put("content", if (content.isEmpty()) JSONObject.NULL else content)
+        // Official DeepSeek API requires reasoning_content to be passed back on
+        // assistant tool-call messages within the same turn when thinking is active.
+        if (isDeepSeek && msg.has("reasoning_content") && !msg.isNull("reasoning_content")) {
+            out.put("reasoning_content", msg.get("reasoning_content"))
+        }
         msg.optJSONArray("tool_calls")?.let { if (it.length() > 0) out.put("tool_calls", it) }
         return out
     }

@@ -480,8 +480,10 @@ class FloatingWindowUi(
      * 朋友 with its count in the corner, so the user can see at a glance how many Andees this one can ask without
      * opening anything. The key itself is an ordinary [barButton]; the badge sits on top of it and ignores touches.
      */
+    private val barDescriptions = mutableListOf<Pair<View, Int>>()
+
     private fun friendsKey(): View {
-        val key = barButton(R.drawable.ic_friends, Glass.PHOTO_INK, "朋友") { listeners.onFriendsClick() }
+        val key = barButton(R.drawable.ic_friends, Glass.PHOTO_INK, R.string.bar_friends) { listeners.onFriendsClick() }
         val lp = key.layoutParams as LinearLayout.LayoutParams
         key.layoutParams = FrameLayout.LayoutParams(lp.width, lp.height)
         val box = FrameLayout(context).apply {
@@ -524,7 +526,7 @@ class FloatingWindowUi(
 
     /** 小本本 with a red dot in the corner while 守卫 is unwritten — the same shape as [friendsKey]. */
     private fun notebookKey(): View {
-        val key = barButton(R.drawable.ic_notebook, Glass.PHOTO_INK, "小本本") { listeners.onNotebookClick() }
+        val key = barButton(R.drawable.ic_notebook, Glass.PHOTO_INK, R.string.bar_notebook) { listeners.onNotebookClick() }
         val lp = key.layoutParams as LinearLayout.LayoutParams
         key.layoutParams = FrameLayout.LayoutParams(lp.width, lp.height)
         val box = FrameLayout(context).apply {
@@ -1249,6 +1251,9 @@ class FloatingWindowUi(
         ui.post {
             tipsText?.text = AppLocale.str(context, R.string.window_tips)
             inputHint?.text = AppLocale.str(context, R.string.window_input_hint)
+            for ((v, res) in barDescriptions) v.contentDescription = AppLocale.str(context, res)
+            muteKey?.contentDescription = AppLocale.str(context, R.string.bar_speak)
+            sceneChipExit?.contentDescription = AppLocale.str(context, R.string.bar_scene_exit)
             paintMute()
             paintViewKey()
             historyView?.onLocaleChanged()
@@ -1392,7 +1397,7 @@ class FloatingWindowUi(
         val here = if (petBody) balls.size + pets.indexOfFirst { it.id == petLook }.coerceAtLeast(0)
         else balls.indexOfFirst { it.name == BallLooks.requestedLook.name }.coerceAtLeast(0)
         val next = Math.floorMod(here + delta, balls.size + pets.size)
-        val zh = VoiceConfig.uiLanguage(context) == "zh"
+        val lang = VoiceConfig.uiLanguage(context)
         if (next < balls.size) {
             val look = balls[next]
             BallLooks.requestByName(look.name)
@@ -1405,7 +1410,7 @@ class FloatingWindowUi(
             VoiceConfig.setPet(context, on = true, character = pet.id)
             this.pet?.poke()
             // Named as a pet: "Andee" is both a ball look and a pet.
-            setSubtitle((if (zh) "桌宠 · " else "Desk pet · ") + (if (zh) pet.zh else pet.en), SubtitleKind.FINAL)
+            setSubtitle(AppLocale.str(context, R.string.pet_subtitle, pet.label(lang)), SubtitleKind.FINAL)
         }
     }
 
@@ -3204,7 +3209,7 @@ class FloatingWindowUi(
         val icon = ImageView(context)
         mute.addView(icon, LinearLayout.LayoutParams(dp(22), dp(22)))
         muteIcon = icon; muteKey = mute
-        mute.contentDescription = "朗读"
+        mute.contentDescription = AppLocale.str(context, R.string.bar_speak)
         paintMute()
         root.addView(mute, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.START))
 
@@ -3287,7 +3292,7 @@ class FloatingWindowUi(
                 textSize = Glass.Type.CAPTION
                 setTextColor(Color.parseColor(Glass.SECONDARY))
                 gravity = Gravity.CENTER
-                contentDescription = "退出情景"
+                contentDescription = AppLocale.str(context, R.string.bar_scene_exit)
                 isClickable = true
                 Glass.pressable(this)
                 setOnClickListener { listeners.onSceneExitClick() }
@@ -3373,60 +3378,28 @@ class FloatingWindowUi(
             gravity = Gravity.CENTER_VERTICAL
         }
 
+        barDescriptions.clear()
         keys.addView(
-            barButton(R.drawable.ic_artifacts, Glass.PHOTO_INK, "产物") { listeners.onArtifactsClick() }
+            barButton(R.drawable.ic_artifacts, Glass.PHOTO_INK, R.string.bar_artifacts) { listeners.onArtifactsClick() }
         )
         // 产物 · 小本本 · 情景 · 朋友 · 自检 · 设置 — the Mac's sidebar has the same doors in the same order.
         keys.addView(notebookKey())
-        keys.addView(barButton(R.drawable.ic_scene, Glass.PHOTO_INK, "情景") { listeners.onScenesClick() })
-        // 朋友 moved into Settings (⚙) to make room for the quit key — see SettingsUi and issue #44.
-        // ✓ and not ■: the stop button used to sit here, and stop is the one
-        // action in this bar the ball can already perform — see onStopClick.
-        keys.addView(barButton(R.drawable.ic_check, Glass.PHOTO_INK, "自检") { listeners.onSelfCheckClick() })
-        // No ⌨ here. Typing moved onto the ball's double-tap, and the bar is
-        // the wrong place for it twice over: it only exists while the card is
-        // unfolded (so the way to type vanished with the fold — the same fault
-        // that made "点右上角的 ⌨" a lie in a failure message), and it put a
-        // second meaning on the one control the user already had to learn.
-        keys.addView(barButton(R.drawable.ic_settings, Glass.PHOTO_INK, "设置") { listeners.onSettingsClick() })
-            // Reads as close, not as resize: the card is a thing you dismiss, and the
-        // corner ball it folds into stays on screen either way.
-        // 彻底退出 Andee (issue #44): a local exit, no voice and no model, so it works with no balance. A power
-        // glyph, not another ✕, so it does not read like 收起; the service pops a confirm before quitting.
-        keys.addView(barButton(R.drawable.ic_power, Glass.PHOTO_INK, "退出") { listeners.onQuitClick() })
-        keys.addView(barButton(R.drawable.ic_close, Glass.PHOTO_INK, "收起") { listeners.onMinimizeClick() })
+        keys.addView(barButton(R.drawable.ic_scene, Glass.PHOTO_INK, R.string.bar_scenes) { listeners.onScenesClick() })
+        keys.addView(barButton(R.drawable.ic_check, Glass.PHOTO_INK, R.string.bar_self_check) { listeners.onSelfCheckClick() })
+        keys.addView(barButton(R.drawable.ic_settings, Glass.PHOTO_INK, R.string.bar_settings) { listeners.onSettingsClick() })
+        keys.addView(barButton(R.drawable.ic_power, Glass.PHOTO_INK, R.string.bar_quit) { listeners.onQuitClick() })
+        keys.addView(barButton(R.drawable.ic_close, Glass.PHOTO_INK, R.string.bar_minimize) { listeners.onMinimizeClick() })
 
         bar.addView(keys)
         return bar
     }
 
-    /**
-     * One of the four permanent keys: a vector icon, tinted, centred in a 36 dp
-     * square with 6 dp of air on each side.
-     *
-     * These were Unicode glyphs (`⋯ ✓ ⚙ ✕`) drawn by a custom View that measured
-     * each character's ink to centre it. That worked around one problem — every
-     * glyph sits at a different height in its font's line box — and could not
-     * work around the other: the weight, size and shape of `⚙` is whatever the
-     * ROM's font says it is, so the bar looked different on every tablet and
-     * never quite matched itself. Vectors are drawn the same everywhere.
-     *
-     * `mutate()` before `setTint`, because drawables from one resource share
-     * constant state and this bar is rebuilt with the card.
-     *
-     * A bare View draws an image without telling anyone it is there, so the
-     * description is not optional: without it the whole control bar drops out
-     * of `get_screen_element` and out of TalkBack alike. Deliberately not
-     * localised — rebuilding the bar on a language change for four content
-     * descriptions nobody reads is the wrong trade.
-     */
     private fun barButton(
         @DrawableRes icon: Int,
         color: String,
-        description: String,
+        @androidx.annotation.StringRes descRes: Int,
         onClick: () -> Unit,
     ): View {
-        // The 36 dp target stays; only the glyph shrinks, to 20 dp.
         val pad = dp(8)
         return ImageView(context).apply {
             setImageDrawable(
@@ -3434,13 +3407,11 @@ class FloatingWindowUi(
                     setTint(Color.parseColor(color))
                 }
             )
-            // Kept so [applyPaletteToChrome] can re-tint it: the tint above is baked
-            // into a mutated drawable at build time and nothing tells this view about a
-            // theme change.
             barIcons += this
+            barDescriptions += this to descRes
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(pad, pad, pad, pad)
-            contentDescription = description
+            contentDescription = AppLocale.str(context, descRes)
             isClickable = true
             isFocusable = true
             Glass.pressable(this)

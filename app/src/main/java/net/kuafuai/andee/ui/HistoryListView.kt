@@ -439,7 +439,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
      */
     private fun buildSuggestions() {
         suggest.removeAllViews()
-        val english = VoiceConfig.uiLanguage(context) == VoiceConfig.LANG_EN
+        val lang = VoiceConfig.uiLanguage(context)
         suggest.addView(
             TextView(context).apply {
                 // Speaking is named before picking, deliberately. "Pick one," on
@@ -467,7 +467,7 @@ class HistoryListView(private val context: Context) : ScrollView(context) {
         )
         for (p in ScenePresets.all) {
             suggest.addView(
-                offer(p, p.text(english)),
+                offer(p, p.text(lang)),
                 LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(10) },
             )
         }

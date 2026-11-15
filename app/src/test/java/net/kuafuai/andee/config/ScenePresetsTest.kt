@@ -22,12 +22,12 @@ class ScenePresetsTest {
     }
 
     @Test
-    fun `every preset fits the limits saveScene enforces, in both languages`() {
+    fun `every preset fits the limits saveScene enforces, in all languages`() {
         for (p in ScenePresets.all) {
             assertTrue("name ${p.name}", nameRule.matches(p.name))
-            for (english in listOf(false, true)) {
-                val t = p.text(english)
-                val tag = "${p.name}/${if (english) "en" else "zh"}"
+            for (lang in listOf(VoiceConfig.LANG_ZH, VoiceConfig.LANG_EN, VoiceConfig.LANG_VI)) {
+                val t = p.text(lang)
+                val tag = "${p.name}/$lang"
                 assertTrue("$tag title blank", t.title.isNotBlank())
                 assertTrue("$tag title over 40", t.title.length <= 40)
                 assertTrue("$tag summary blank", t.summary.isNotBlank())

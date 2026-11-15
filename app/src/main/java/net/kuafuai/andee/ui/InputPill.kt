@@ -42,13 +42,19 @@ object InputPill {
             Glass.pressable(this)
             setOnClickListener { onClick() }
         }
-        pill.addView(icon(R.drawable.ic_camera, "拍照", onCamera), LinearLayout.LayoutParams(dp(36), dp(36)))
-        pill.addView(icon(R.drawable.ic_image, "相册", onAlbum), LinearLayout.LayoutParams(dp(36), dp(36)))
+        pill.addView(
+            icon(R.drawable.ic_camera, net.kuafuai.andee.i18n.AppLocale.str(context, R.string.input_take_photo), onCamera),
+            LinearLayout.LayoutParams(dp(36), dp(36)),
+        )
+        pill.addView(
+            icon(R.drawable.ic_image, net.kuafuai.andee.i18n.AppLocale.str(context, R.string.input_pick_photos), onAlbum),
+            LinearLayout.LayoutParams(dp(36), dp(36)),
+        )
         pill.addView(middle, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(4) })
         val send = ImageView(context).apply {
             setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_send)?.mutate())
             setColorFilter(Color.WHITE)
-            contentDescription = "发送"
+            contentDescription = net.kuafuai.andee.i18n.AppLocale.str(context, R.string.input_send)
             setPadding(dp(8), dp(8), dp(8), dp(8))
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL

@@ -102,10 +102,10 @@ class SystemTts(
             // data" is fatal; "not supported" is left to the synthesis itself
             // to prove, so a fallback engine whose default is Chinese is not
             // wrongly gated out.
-            val lang = if (VoiceConfig.uiLanguage(context) == VoiceConfig.LANG_EN) {
-                Locale.US
-            } else {
-                Locale.SIMPLIFIED_CHINESE
+            val lang = when (VoiceConfig.uiLanguage(context)) {
+                VoiceConfig.LANG_VI -> Locale("vi", "VN")
+                VoiceConfig.LANG_EN -> Locale.US
+                else -> Locale.SIMPLIFIED_CHINESE
             }
             val langResult = engine.setLanguage(lang)
             if (langResult == TextToSpeech.LANG_MISSING_DATA) {

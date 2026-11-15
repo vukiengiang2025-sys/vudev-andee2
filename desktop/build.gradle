@@ -12,10 +12,6 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.compose'
 }
 
-kotlin {
-    jvmToolchain(17)
-}
-
 // Native helpers, compiled with the Command Line Tools' swiftc.
 //
 // The Mac this is built for: x86_64 (Intel) or arm64 (Apple Silicon). The Swift

@@ -1039,4 +1039,18 @@
     <string name="window_wake_off">Wake listening off (mic free)</string>
     <string name="check_title_platform">Android version too old</string>
     <string name="check_detail_platform_old">This device runs Android %1$s (API %2$d), below Android 11. Screen capture, visual tap targeting and window blur need newer system APIs and are unavailable. Chat, voice, notebook and settings still work. Upgrade to Android 11 or later to restore them.</string>
+    <string name="bar_friends">Friends</string>
+    <string name="bar_notebook">Notebook</string>
+    <string name="bar_speak">Speak</string>
+    <string name="bar_scene_exit">Exit scene</string>
+    <string name="bar_artifacts">Artifacts</string>
+    <string name="bar_scenes">Scenes</string>
+    <string name="bar_self_check">Self-check</string>
+    <string name="bar_settings">Settings</string>
+    <string name="bar_quit">Quit</string>
+    <string name="bar_minimize">Minimize</string>
+    <string name="pet_subtitle">Desk pet · %1$s</string>
+    <string name="expr_section_body">Body</string>
+    <string name="expr_body_ball">Ball</string>
+    <string name="expr_body_pet">Desk pet</string>
 </resources>

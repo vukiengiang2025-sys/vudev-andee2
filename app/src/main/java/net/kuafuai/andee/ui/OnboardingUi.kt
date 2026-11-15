@@ -90,8 +90,8 @@ class OnboardingUi(
     private val motion: Boolean get() = ValueAnimator.areAnimatorsEnabled()
 
     private var selectedBrain = when (VoiceConfig.brainMode(context)) {
-        VoiceConfig.BRAIN_LOCAL -> VoiceConfig.BRAIN_LOCAL
-        else -> VoiceConfig.BRAIN_CODEFLYING
+        VoiceConfig.BRAIN_CODEFLYING -> VoiceConfig.BRAIN_CODEFLYING
+        else -> VoiceConfig.BRAIN_LOCAL
     }
     private val initialConfig = VoiceConfig.current(context)
     private var draftCodeFlyingKey = initialConfig["codeflying_key"].orEmpty()
@@ -105,13 +105,18 @@ class OnboardingUi(
 
     // Voice, for the local brain only: CodeFlying brings its own from the build.
     // Who hears and who speaks are two pickers, as in SettingsUi.
-    private var draftHear = initialConfig["voice_provider"].orEmpty()
-        .ifBlank { VoiceConfig.VOICE_HUOSHAN }
-    private var draftSpeak = initialConfig["speak_provider"].orEmpty()
-        .ifBlank { draftHear }
     private var draftVolcKey = initialConfig["api_key"].orEmpty()
     private var draftGoogleKey = initialConfig["google_api_key"].orEmpty()
     private var draftGoogleProject = initialConfig["google_project"].orEmpty()
+    private var draftHear = initialConfig["voice_provider"].orEmpty()
+        .ifBlank { VoiceConfig.VOICE_HUOSHAN }
+    private var draftSpeak = initialConfig["speak_provider"].orEmpty().ifBlank {
+        if (draftVolcKey.isNotBlank() || draftGoogleKey.isNotBlank() || VoiceConfig.googleApiKeyDefault().isNotBlank()) {
+            draftHear
+        } else {
+            VoiceConfig.VOICE_SYSTEM
+        }
+    }
     private var volcKeyEdit: EditText? = null
     private var googleKeyEdit: EditText? = null
     private var googleProjectEdit: EditText? = null
@@ -398,15 +403,19 @@ class OnboardingUi(
         val lang = VoiceConfig.uiLanguage(context)
         body.addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            listOf(VoiceConfig.LANG_ZH to "中文", VoiceConfig.LANG_EN to "English").forEachIndexed { i, (code, name) ->
-                addView(modelChoice(name, if (code == VoiceConfig.LANG_ZH) "Chinese" else "英文", code == lang) {
+            listOf(
+                Triple(VoiceConfig.LANG_VI, "Tiếng Việt", "VI"),
+                Triple(VoiceConfig.LANG_ZH, "中文", "ZH"),
+                Triple(VoiceConfig.LANG_EN, "English", "EN"),
+            ).forEachIndexed { i, (code, name, tag) ->
+                addView(modelChoice(name, tag, code == lang) {
                     if (code == lang) return@modelChoice
                     // The same single write SettingsUi and LangToggle make.
                     VoiceConfig.save(context, mapOf("lang" to code))
                     onPrefsChanged()
                     render(animated = false)
                     ball?.greet()
-                }, LinearLayout.LayoutParams(0, WRAP, 1f).apply { if (i > 0) marginStart = dp(10) })
+                }, LinearLayout.LayoutParams(0, WRAP, 1f).apply { if (i > 0) marginStart = dp(8) })
             }
         }, spacedParams(8))
 
@@ -748,33 +757,35 @@ class OnboardingUi(
             R.string.onboarding_model_body,
         )
 
+        val hasCodeFlying = VoiceConfig.codeFlyingEndpoint(context) != null
         val choices = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
         }
-        choices.addView(
-            modelChoice(
-                title = "CodeFlying",
-                subtitle = lctx.getString(R.string.onboarding_model_recommended),
-                selected = selectedBrain == VoiceConfig.BRAIN_CODEFLYING,
-            ) {
-                captureModelDrafts()
-                selectedBrain = VoiceConfig.BRAIN_CODEFLYING
-                render(animated = true)
-            },
-            LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginEnd = dp(5) },
-        )
-        choices.addView(
-            modelChoice(
-                title = lctx.getString(R.string.onboarding_model_local_title),
-                subtitle = "API",
-                selected = selectedBrain == VoiceConfig.BRAIN_LOCAL,
-            ) {
-                captureModelDrafts()
-                selectedBrain = VoiceConfig.BRAIN_LOCAL
-                render(animated = true)
-            },
-            LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = dp(5) },
-        )
+        val cfCard = modelChoice(
+            title = "CodeFlying",
+            subtitle = if (hasCodeFlying) lctx.getString(R.string.onboarding_model_recommended) else "Hosted",
+            selected = selectedBrain == VoiceConfig.BRAIN_CODEFLYING,
+        ) {
+            captureModelDrafts()
+            selectedBrain = VoiceConfig.BRAIN_CODEFLYING
+            render(animated = true)
+        }
+        val localCard = modelChoice(
+            title = lctx.getString(R.string.onboarding_model_local_title),
+            subtitle = if (hasCodeFlying) "API" else lctx.getString(R.string.onboarding_model_recommended),
+            selected = selectedBrain == VoiceConfig.BRAIN_LOCAL,
+        ) {
+            captureModelDrafts()
+            selectedBrain = VoiceConfig.BRAIN_LOCAL
+            render(animated = true)
+        }
+        if (hasCodeFlying) {
+            choices.addView(cfCard, LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginEnd = dp(5) })
+            choices.addView(localCard, LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = dp(5) })
+        } else {
+            choices.addView(localCard, LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginEnd = dp(5) })
+            choices.addView(cfCard, LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = dp(5) })
+        }
         body.addView(choices, spacedParams(18))
 
         val form = panel()
@@ -826,26 +837,25 @@ class OnboardingUi(
                 ball?.trigger(Action.SHAKE)
                 return@primaryButton
             }
-            if (selectedBrain == VoiceConfig.BRAIN_LOCAL && !voiceDraftComplete()) {
-                error.text = lctx.getString(R.string.onboarding_voice_key_required)
-                error.visibility = View.VISIBLE
-                mood(Mood.ANXIOUS)
-                ball?.trigger(Action.SHAKE)
-                return@primaryButton
-            }
             val updates = if (selectedBrain == VoiceConfig.BRAIN_CODEFLYING) {
                 mapOf(
                     "brain" to VoiceConfig.BRAIN_CODEFLYING,
                     "codeflying_key" to draftCodeFlyingKey,
                 )
             } else {
+                val speakMissingKey = when (draftSpeak) {
+                    VoiceConfig.VOICE_HUOSHAN -> draftVolcKey.isBlank()
+                    VoiceConfig.VOICE_GOOGLE -> draftGoogleKey.isBlank() && VoiceConfig.googleApiKeyDefault().isBlank()
+                    else -> false
+                }
+                val resolvedSpeak = if (speakMissingKey) VoiceConfig.VOICE_SYSTEM else draftSpeak
                 mapOf(
                     "brain" to VoiceConfig.BRAIN_LOCAL,
                     "llm_api_key" to draftLocalKey,
                     "llm_base_url" to draftLocalBase,
                     "llm_model" to draftLocalModel,
                     "voice_provider" to draftHear,
-                    "speak_provider" to draftSpeak,
+                    "speak_provider" to resolvedSpeak,
                     // Blank values are dropped by save(), so an untouched key
                     // field keeps whatever was there.
                     "api_key" to draftVolcKey,
@@ -872,20 +882,6 @@ class OnboardingUi(
 
     private fun usesHuoshan() = draftHear == VoiceConfig.VOICE_HUOSHAN || draftSpeak == VoiceConfig.VOICE_HUOSHAN
     private fun usesGoogle() = draftHear == VoiceConfig.VOICE_GOOGLE || draftSpeak == VoiceConfig.VOICE_GOOGLE
-
-    /**
-     * Mirrors [SelfCheck]'s voice row against the drafts, before they are
-     * saved: every provider in use needs its key. A build packaged with a
-     * Google key/project needs neither typed.
-     */
-    private fun voiceDraftComplete(): Boolean {
-        if (usesHuoshan() && draftVolcKey.isBlank()) return false
-        if (usesGoogle()) {
-            if (draftGoogleKey.isBlank() && VoiceConfig.googleApiKeyDefault().isBlank()) return false
-            if (draftGoogleProject.isBlank() && VoiceConfig.googleProjectDefault().isBlank()) return false
-        }
-        return true
-    }
 
     /**
      * Who hears, who speaks, and only the keys those two need. Endpoints and

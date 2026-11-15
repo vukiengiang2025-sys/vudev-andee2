@@ -153,8 +153,8 @@ class SettingsUi(
     /** Saved values, read once per [show]. See the class KDoc. */
     private var saved: Map<String, String> = emptyMap()
 
-    /** English rather than Chinese. Resolved in [show]; flipped by [rebuild]. */
-    private var english = false
+    /** Selected UI language code. Resolved in [show]; updated by [langPicker]. */
+    private var uiLang = VoiceConfig.LANG_VI
 
     /**
      * Strings in the user's language, refreshed at the top of [build].
@@ -207,7 +207,7 @@ class SettingsUi(
         if (root != null) return
 
         saved = VoiceConfig.current(context)
-        english = saved["lang"] == VoiceConfig.LANG_EN
+        uiLang = saved["lang"].orEmpty().ifEmpty { VoiceConfig.uiLanguage(context) }
         val p = WindowManager.LayoutParams(
             cardWidth(), cardHeight(),
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -546,15 +546,16 @@ class SettingsUi(
         // must NOT be translated, and translating them is the one way to make
         // the picker unusable.
         options = listOf(
+            VoiceConfig.LANG_VI to "VI",
             VoiceConfig.LANG_ZH to "中",
             VoiceConfig.LANG_EN to "EN",
         ),
-        picked = if (english) VoiceConfig.LANG_EN else VoiceConfig.LANG_ZH,
+        picked = uiLang,
         radius = dp(14),
         compact = true,
     ) { lang ->
         VoiceConfig.save(context, mapOf("lang" to lang))
-        english = lang == VoiceConfig.LANG_EN
+        uiLang = lang
         // The overlays behind this card first, then this card. Both are cheap;
         // the order only matters so that the two are never briefly in different
         // languages while the cross-fade runs.
@@ -626,9 +627,15 @@ class SettingsUi(
         // the user having to re-pick.
         // CodeFlying leads: it is the default tab on a fresh install, and the
         // leftmost cell is the fallback (see [segmented]).
+        val hasCodeFlying = VoiceConfig.codeFlyingEndpoint(context) != null
         val options = buildList {
-            add(VoiceConfig.BRAIN_CODEFLYING to lctx.getString(R.string.settings_brain_codeflying))
-            add(VoiceConfig.BRAIN_LOCAL to lctx.getString(R.string.settings_brain_local))
+            if (hasCodeFlying) {
+                add(VoiceConfig.BRAIN_CODEFLYING to lctx.getString(R.string.settings_brain_codeflying))
+                add(VoiceConfig.BRAIN_LOCAL to lctx.getString(R.string.settings_brain_local))
+            } else {
+                add(VoiceConfig.BRAIN_LOCAL to lctx.getString(R.string.settings_brain_local))
+                add(VoiceConfig.BRAIN_CODEFLYING to lctx.getString(R.string.settings_brain_codeflying))
+            }
             if (VoiceConfig.showHub(context)) {
                 add(VoiceConfig.BRAIN_HUB to lctx.getString(R.string.settings_brain_cloud))
             }

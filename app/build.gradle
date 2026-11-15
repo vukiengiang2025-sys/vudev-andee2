@@ -192,7 +192,19 @@ android {
         }
     }
 
+    signingConfigs {
+        debugConfig {
+            storeFile file("${rootDir}/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debugConfig
+        }
         release {
             minifyEnabled true
             shrinkResources true
@@ -210,7 +222,7 @@ android {
     // app cannot be provisioned on anyway.
     splits {
         abi {
-            enable true
+            enable false
             reset()
             include 'arm64-v8a', 'armeabi-v7a', 'x86_64'
             universalApk false

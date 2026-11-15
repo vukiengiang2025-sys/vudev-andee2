@@ -1120,4 +1120,18 @@
     <string name="window_wake_off">唤醒监听已关（不占话筒）</string>
     <string name="check_title_platform">系统版本偏低</string>
     <string name="check_detail_platform_old">当前是 Android %1$s（API %2$d），低于 Android 11。屏幕截图、看图点击、窗口毛玻璃等依赖新系统接口的功能不可用；聊天、语音、笔记和设置仍可正常使用。升级到 Android 11 及以上即可恢复。</string>
+    <string name="bar_friends">朋友</string>
+    <string name="bar_notebook">小本本</string>
+    <string name="bar_speak">朗读</string>
+    <string name="bar_scene_exit">退出情景</string>
+    <string name="bar_artifacts">产物</string>
+    <string name="bar_scenes">情景</string>
+    <string name="bar_self_check">自检</string>
+    <string name="bar_settings">设置</string>
+    <string name="bar_quit">退出</string>
+    <string name="bar_minimize">收起</string>
+    <string name="pet_subtitle">桌宠 · %1$s</string>
+    <string name="expr_section_body">身体</string>
+    <string name="expr_body_ball">小球</string>
+    <string name="expr_body_pet">桌宠</string>
 </resources>

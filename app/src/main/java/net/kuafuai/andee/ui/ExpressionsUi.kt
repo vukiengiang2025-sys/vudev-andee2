@@ -145,12 +145,14 @@ class ExpressionsUi(
         card.addView(caption)
 
         // ---- Which body: the ball, or the desk pet ----
-        val zh = VoiceConfig.uiLanguage(context) == "zh"
         petBody = VoiceConfig.petOn(context)
-        card.addView(heading(if (zh) "身体" else "Body"))
+        card.addView(heading(lctx.getString(R.string.expr_section_body)))
         card.addView(chipRow {
-            // 小球 leftmost: it is what an unset preference reads as.
-            for ((on, label) in listOf(false to (if (zh) "小球" else "Ball"), true to (if (zh) "桌宠" else "Desk pet"))) {
+            // Ball leftmost: it is what an unset preference reads as.
+            for ((on, label) in listOf(
+                false to lctx.getString(R.string.expr_body_ball),
+                true to lctx.getString(R.string.expr_body_pet),
+            )) {
                 val chip = chip(label) { pickBody(on) }
                 chip.tag = on
                 bodyChips.add(chip)
@@ -238,10 +240,10 @@ class ExpressionsUi(
         val row = lookRow ?: return
         row.removeAllViews()
         lookChips.clear()
-        val zh = VoiceConfig.uiLanguage(context) == "zh"
+        val lang = VoiceConfig.uiLanguage(context)
         if (petBody) {
             for (c in net.kuafuai.andee.pet.PetCharacters.PRESETS) {
-                val chip = chip(if (zh) c.zh else c.en) { pickPet(c.id) }
+                val chip = chip(c.label(lang)) { pickPet(c.id) }
                 chip.tag = c.id
                 lookChips.add(chip)
                 row.addView(chip, chipParams())
@@ -292,12 +294,12 @@ class ExpressionsUi(
         petPreview?.visibility = if (petBody) View.VISIBLE else View.GONE
         if (petBody) {
             val id = VoiceConfig.petCharacter(context)
-            val zh = VoiceConfig.uiLanguage(context) == "zh"
+            val lang = VoiceConfig.uiLanguage(context)
             petPreview?.look = id
             petPreview?.setStatePose(net.kuafuai.andee.pet.PetMind.previewPose(pickedMood))
             for (chip in lookChips) light(chip, chip.tag == id)
             // Who this is, not only how it looks: its voice and manner come with it.
-            caption?.text = net.kuafuai.andee.pet.PetCharacters.blurb(id, zh)
+            caption?.text = net.kuafuai.andee.pet.PetCharacters.blurb(id, lang)
             return
         }
         preview?.setMood(pickedMood)

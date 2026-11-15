@@ -311,18 +311,29 @@ class Gear(private val book: NotebookBook) {
  * person passes [zh] so they read their own language.
  */
 object Ages {
-    fun ago(ms: Long, zh: Boolean = false): String {
+    fun ago(ms: Long, zh: Boolean = false): String = ago(ms, if (zh) "zh" else "en")
+
+    fun ago(ms: Long, lang: String): String {
         val m = (ms / 60_000).coerceAtLeast(0)
-        return if (zh) when {
-            m < 2 -> "刚刚"
-            m < 90 -> "$m 分钟前"
-            m < 36 * 60 -> "${m / 60} 小时前"
-            else -> "${m / (24 * 60)} 天前"
-        } else when {
-            m < 2 -> "just now"
-            m < 90 -> "$m min ago"
-            m < 36 * 60 -> "${m / 60} h ago"
-            else -> "${m / (24 * 60)} days ago"
+        return when (lang) {
+            "zh" -> when {
+                m < 2 -> "刚刚"
+                m < 90 -> "$m 分钟前"
+                m < 36 * 60 -> "${m / 60} 小时前"
+                else -> "${m / (24 * 60)} 天前"
+            }
+            "vi" -> when {
+                m < 2 -> "vừa xong"
+                m < 90 -> "$m phút trước"
+                m < 36 * 60 -> "${m / 60} giờ trước"
+                else -> "${m / (24 * 60)} ngày trước"
+            }
+            else -> when {
+                m < 2 -> "just now"
+                m < 90 -> "$m min ago"
+                m < 36 * 60 -> "${m / 60} h ago"
+                else -> "${m / (24 * 60)} days ago"
+            }
         }
     }
 }

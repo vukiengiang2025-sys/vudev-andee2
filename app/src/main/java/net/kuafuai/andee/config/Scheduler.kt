@@ -214,12 +214,23 @@ object Scheduler {
         // The phone has a stage, so it seeds the care of keeping it (see Selfhood.seedStageCare). In the
         // interface language: it is shown in 小本本 → 在意 as well as read by the model.
         runCatching {
-            val en = VoiceConfig.uiLanguage(context) == VoiceConfig.LANG_EN
+            val lang = VoiceConfig.uiLanguage(context)
             Notebook.selfhood(context).seedStageCare(
-                what = if (en) "Keep my stage" else "打理我的舞台",
-                why = if (en) "The middle of my home screen is the first thing they see when they open me; a day unchanged is worth a look."
-                else "首页中间是他打开我时第一眼看到的地方，一天没变就该看看要不要换。",
-                source = if (en) "the device: the stage is yours" else "设备：舞台是你自己的地方",
+                what = when (lang) {
+                    VoiceConfig.LANG_VI -> "Chăm chút sân khấu của mình"
+                    VoiceConfig.LANG_EN -> "Keep my stage"
+                    else -> "打理我的舞台"
+                },
+                why = when (lang) {
+                    VoiceConfig.LANG_VI -> "Phần giữa màn hình chính là thứ đầu tiên họ thấy khi mở tôi; một ngày chưa đổi là đáng để xem lại."
+                    VoiceConfig.LANG_EN -> "The middle of my home screen is the first thing they see when they open me; a day unchanged is worth a look."
+                    else -> "首页中间是他打开我时第一眼看到的地方，一天没变就该看看要不要换。"
+                },
+                source = when (lang) {
+                    VoiceConfig.LANG_VI -> "thiết bị: sân khấu là không gian của bạn"
+                    VoiceConfig.LANG_EN -> "the device: the stage is yours"
+                    else -> "设备：舞台是你自己的地方"
+                },
             )
         }.onFailure { Log.w(TAG, "could not seed the stage's care", it) }
         val now = System.currentTimeMillis()

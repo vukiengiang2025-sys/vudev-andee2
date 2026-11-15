@@ -204,7 +204,7 @@ class GearUi(
         val top = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         top.addView(TextView(context).apply {
             text = if (scanned > 0) {
-                lctx.getString(R.string.gear_scanned_ago, Ages.ago(System.currentTimeMillis() - scanned, zh()))
+                lctx.getString(R.string.gear_scanned_ago, Ages.ago(System.currentTimeMillis() - scanned, lang()))
             } else lctx.getString(R.string.gear_never_scanned)
             textSize = Glass.Type.CAPTION
             setTextColor(Color.parseColor(Glass.SECONDARY))
@@ -260,7 +260,7 @@ class GearUi(
 
     private fun row(i: Gear.Item, hidden: Boolean): View {
         val now = System.currentTimeMillis()
-        val z = zh()
+        val l = lang()
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(12), dp(14), dp(12))
@@ -282,10 +282,10 @@ class GearUi(
         row.addView(head, matchWrap())
 
         val meta = buildList {
-            if (i.lastUsedAt > 0) add(lctx.getString(R.string.gear_last_used, Ages.ago(now - i.lastUsedAt, z)))
+            if (i.lastUsedAt > 0) add(lctx.getString(R.string.gear_last_used, Ages.ago(now - i.lastUsedAt, l)))
             if (i.uses > 0) add(lctx.getString(R.string.gear_uses, i.uses))
-            if (i.signedIn == "yes") add(lctx.getString(R.string.gear_signed_in) + " (" + Ages.ago(now - i.signedInAt, z) + ")")
-            if (i.signedIn == "no") add(lctx.getString(R.string.gear_signed_out) + " (" + Ages.ago(now - i.signedInAt, z) + ")")
+            if (i.signedIn == "yes") add(lctx.getString(R.string.gear_signed_in) + " (" + Ages.ago(now - i.signedInAt, l) + ")")
+            if (i.signedIn == "no") add(lctx.getString(R.string.gear_signed_out) + " (" + Ages.ago(now - i.signedInAt, l) + ")")
             if (i.limit.isNotBlank()) add(i.limit)
         }.joinToString(" · ")
         if (meta.isNotEmpty()) row.addView(TextView(context).apply {
@@ -349,7 +349,7 @@ class GearUi(
 
     // ---- small pieces ----
 
-    private fun zh(): Boolean = lctx.resources.configuration.locales[0].language == "zh"
+    private fun lang(): String = lctx.resources.configuration.locales[0].language
 
     private fun sectionTitle(text: String) = TextView(context).apply {
         this.text = text

@@ -1332,7 +1332,11 @@ object SelfCheck {
                 .put("model", model)
                 .put("stream", false)
                 .put("max_tokens", 1)
-                .put("thinking", JSONObject().put("type", "disabled"))
+                .apply {
+                    if (!model.contains("reasoner", ignoreCase = true)) {
+                        put("thinking", JSONObject().put("type", "disabled"))
+                    }
+                }
                 .put(
                     "messages",
                     JSONArray().put(JSONObject().put("role", "user").put("content", "hi")),

@@ -184,7 +184,8 @@ object VoiceConfig {
         const val BRAIN_CODEFLYING = net.kuafuai.andee.config.BrainConfig.BRAIN_CODEFLYING
 
         const val DEFAULT_LLM_BASE_URL = "https://api.deepseek.com"
-        const val DEFAULT_LLM_MODEL = "deepseek-flash"
+        const val DEFAULT_LLM_MODEL = "deepseek-chat"
+        private const val DEFAULT_CODEFLYING_MODEL = "deepseek-flash"
         const val DEFAULT_REASONING_EFFORT = "high"
 
         /**
@@ -367,7 +368,7 @@ object VoiceConfig {
                 BRAIN_HUB -> BRAIN_HUB
                 BRAIN_LOCAL -> BRAIN_LOCAL
                 BRAIN_CODEFLYING -> BRAIN_CODEFLYING
-                "" -> BRAIN_CODEFLYING
+                "" -> if (codeFlyingEndpoint(context) != null) BRAIN_CODEFLYING else BRAIN_LOCAL
                 else -> BRAIN_LOCAL
             }
         }
@@ -384,8 +385,8 @@ object VoiceConfig {
                     mode = BRAIN_CODEFLYING,
                     apiKey = codeFlyingKey(context),
                     baseUrl = codeFlyingLlmBaseUrl(context),
-                    model = p.getString("llm_model", DEFAULT_LLM_MODEL)
-                        .orEmpty().trim().ifEmpty { DEFAULT_LLM_MODEL },
+                    model = p.getString("llm_model", DEFAULT_CODEFLYING_MODEL)
+                        .orEmpty().trim().ifEmpty { DEFAULT_CODEFLYING_MODEL },
                     thinking = p.getString("llm_thinking", defaultThinking())
                         ?.trim()?.lowercase() != "disabled",
                     reasoningEffort = p.getString("llm_reasoning_effort", DEFAULT_REASONING_EFFORT)
@@ -545,13 +546,18 @@ object VoiceConfig {
          */
         fun speakProvider(context: Context): String {
             if (brainMode(context) == BRAIN_CODEFLYING) return VOICE_HUOSHAN
-            val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getString("speak_provider", "").orEmpty().trim().lowercase()
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val saved = prefs.getString("speak_provider", "").orEmpty().trim().lowercase()
             return when (saved) {
                 VOICE_GOOGLE -> VOICE_GOOGLE
                 VOICE_SYSTEM -> VOICE_SYSTEM
                 VOICE_HUOSHAN -> VOICE_HUOSHAN
-                "" -> voiceProvider(context)
+                "" -> {
+                    val hasVolc = prefs.getString("api_key", "").orEmpty().isNotBlank() || API_KEY.isNotBlank()
+                    val hasGoogle = prefs.getString("google_api_key", "").orEmpty().isNotBlank() ||
+                        googleApiKeyDefault().isNotBlank()
+                    if (hasVolc || hasGoogle) voiceProvider(context) else VOICE_SYSTEM
+                }
                 else -> VOICE_HUOSHAN
             }
         }
@@ -695,7 +701,8 @@ object VoiceConfig {
                 // What the card selects: nothing saved is CodeFlying (the default tab for a
                 // new install), whether or not this build can run it — the tab then says so.
                 // Not bc.mode, which has CodeFlying already resolved away to local.
-                "brain" to p.getString("brain", "").orEmpty().trim().lowercase().ifEmpty { BRAIN_CODEFLYING },
+                "brain" to p.getString("brain", "").orEmpty().trim().lowercase()
+                    .ifEmpty { if (codeFlyingEndpoint(context) != null) BRAIN_CODEFLYING else BRAIN_LOCAL },
                 "show_hub" to if (showHub(context)) "on" else "off",
                 // llm_api_key / llm_base_url / llm_model are the 本机 tab's rows —
                 // the user's own credentials and the endpoint they point at.
@@ -777,22 +784,15 @@ object VoiceConfig {
                 .getString("max_steps", "")?.trim()?.toIntOrNull()
                 ?: DEFAULT_MAX_STEPS).coerceIn(1, 200)
 
+        const val LANG_VI = "vi"
         const val LANG_ZH = "zh"
         const val LANG_EN = "en"
 
         /**
-         * Which language the user-facing UI speaks. [LANG_ZH] or [LANG_EN].
+         * Which language the user-facing UI speaks: [LANG_VI], [LANG_ZH] or [LANG_EN].
          *
-         * Unset means *unset*, not Chinese: it falls through to the device's own
-         * locale, because a tablet set to English showing a Chinese settings
-         * card is the same bug as the reverse. Once the user picks one, the
-         * saved value wins over the locale forever — they have said what they
-         * want and a system language change should not overrule them.
-         *
-         * Not part of [current] merely for display: [net.kuafuai.andee.ui.SettingsUi]
-         * writes this one the moment it is tapped rather than on 保存, because
-         * the card redraws in the new language and that redraw *is* the
-         * confirmation. Nothing else on this device is written eagerly.
+         * Defaults to Vietnamese ([LANG_VI]) when nothing is saved, while keeping
+         * saved user choices and `BuildConfig.DEFAULT_LANG` ahead of the fallback.
          */
         /** The user turned reading answers aloud off (the card's speaker key). Off by default, as on the Mac. */
         fun muted(context: Context): Boolean =
@@ -803,16 +803,17 @@ object VoiceConfig {
         fun uiLanguage(context: Context): String {
             val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .getString("lang", "").orEmpty().trim().lowercase()
+            if (saved == LANG_VI) return LANG_VI
             if (saved == LANG_EN) return LANG_EN
             if (saved == LANG_ZH) return LANG_ZH
             // The build's `DEFAULT_LANG` (local.properties) is the language of a
-            // device nobody has picked for yet. It sits below the saved choice
-            // and above the system locale; anything but zh/en reads as unset.
+            // device nobody has picked for yet.
             when (BuildConfig.DEFAULT_LANG.trim().lowercase()) {
+                LANG_VI -> return LANG_VI
                 LANG_EN -> return LANG_EN
                 LANG_ZH -> return LANG_ZH
             }
-            return if (java.util.Locale.getDefault().language == "zh") LANG_ZH else LANG_EN
+            return LANG_VI
         }
 
         /**

@@ -55,24 +55,18 @@ class LangToggle(
 ) : FrameLayout(context) {
 
     private companion object {
-        /** The two tags this app ships, and the only two strings in it that must not be translated. */
-        val OPTIONS = listOf(VoiceConfig.LANG_ZH to "中", VoiceConfig.LANG_EN to "EN")
+        /** The three languages this app ships; each label stays in its own script. */
+        val OPTIONS = listOf(
+            VoiceConfig.LANG_VI to "VI",
+            VoiceConfig.LANG_ZH to "中",
+            VoiceConfig.LANG_EN to "EN",
+        )
 
         const val INSET_DP = 3
         const val RADIUS_DP = 16
 
-        /**
-         * Keeps the two cells the same width.
-         *
-         * They are not naturally: `中` is one CJK glyph and `EN` is two Latin
-         * ones, so with `WRAP_CONTENT` alone the picked pane visibly changes
-         * size when you switch, which reads as the control *resizing* rather
-         * than as a selection moving. Weights cannot fix it either — a
-         * `layout_weight` needs `width = 0`, and a weighted child in a
-         * `WRAP_CONTENT` parent has nothing to distribute. A floor under both
-         * cells is the version that works with a wrapping track.
-         */
-        const val CELL_MIN_W_DP = 46
+        /** Keeps the three cells evenly balanced inside the wrapping track. */
+        const val CELL_MIN_W_DP = 36
     }
 
     private val cells = mutableListOf<TextView>()
@@ -94,7 +88,7 @@ class LangToggle(
                 setTypeface(typeface, Typeface.BOLD)
                 gravity = Gravity.CENTER
                 minWidth = context.dpI(CELL_MIN_W_DP)
-                setPadding(context.dpI(14), context.dpI(6), context.dpI(14), context.dpI(6))
+                setPadding(context.dpI(10), context.dpI(6), context.dpI(10), context.dpI(6))
                 isClickable = true
                 setOnClickListener { pick(tag) }
             }

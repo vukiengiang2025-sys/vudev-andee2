@@ -19,6 +19,9 @@ internal object VoiceExitCommand {
         "退出安迪", "关闭安迪", "安迪退出", "安迪关闭",
         "休息一下", "先休息一下", "你先休息一下",
         "Andee 休息一下", "安迪休息一下", "安迪你先休息一下",
+        "thoát Andee", "tắt Andee", "đóng Andee",
+        "Andee thoát", "Andee tắt", "Andee đóng",
+        "nghỉ ngơi đi", "tạm nghỉ đi", "Andee nghỉ đi",
     ).map(::normalize).toSet()
 
     fun matches(text: String, userInitiated: Boolean = true): Boolean =
