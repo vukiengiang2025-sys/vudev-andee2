@@ -94,6 +94,21 @@ Chưa gọi API thật của từng hãng vì môi trường không có key ngư
 - 93 thành phần bên thứ ba, gồm ML Kit Terms of Service (6) và Android SDK License (4) — không phải open source; cần xem lại nếu phân phối rộng.
 - Không phải tư vấn pháp lý; nếu thương mại hoá, liên hệ KUAFUAI trước.
 
+
+## Bổ sung — kiểm thử trên Redmi 15 5G (16/11/2026, chiều)
+
+Điện thoại được nối lại và đã cài/test bản APK mới:
+
+- Cài và mở app: onboarding, Tự kiểm tra, Trung tâm AI đều hiển thị tiếng Việt, không crash.
+- Trung tâm AI: sửa provider sang endpoint giả lập (adb reverse), bấm Kiểm tra kết nối → "Kết nối OK sau 81 ms · mock-model"; lưu key → prefs chỉ còn dạng mã hoá v1:<ciphertext>, không còn plaintext.
+- Não dựng lại đúng endpoint; một lượt chat và một lượt có tool-call (get_device_status) chạy trọn vòng qua LLM giả lập, câu trả lời lưu vào chat_history.json.
+- Điều khiển màn hình qua dispatcher: screen.ui_tree trả 58 node, screen.screenshot trả PNG, screen.global home đưa máy về launcher — tất cả đạt.
+- Cấp thêm quyền qua adb: notification listener, battery whitelist; Tự kiểm tra còn 2 mục tùy chọn (khoá giọng nói đám mây, tự khởi chạy HyperOS).
+- 6 lỗi tìm thấy khi chạy thật đã được sửa (xem reports/TEST-REPORT.md mục 4b), commit 12091ff.
+- APK mới: 29.228.359 byte, SHA-256 81b58a26e51ac794dbf3ed331fa669e7663f04ecc4102c66a54b3e5abefa5fe1, đã thay thế tệp trong bản phát hành.
+
+Lưu ý cho chủ máy: cấu hình đang lưu là model deepseek-flash với Base URL mặc định https://api.deepseek.com. Nếu key là DeepSeek chính thức, hãy mở Trung tâm AI và đổi model sang deepseek-chat (deepseek-flash là tên model của CodeFlying). HyperOS tắt Accessibility sau khi cập nhật/force-stop app — cần bật lại trong Cài đặt → Hỗ trợ tiếp cận → Andee.
+
 ## 13. Hướng phát triển tiếp theo
 
 1. Cài APK lên Redmi 15 5G, kiểm thử luồng thật (onboarding, provider center, khôi phục sau reboot), lấy logcat.
