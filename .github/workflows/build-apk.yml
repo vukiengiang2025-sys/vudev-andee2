@@ -56,10 +56,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
-
+      # ubuntu-latest already ships the Android SDK at /usr/local/lib/android/sdk.
+      # android-actions/setup-android@v3 is not used: on the current runner image
+      # it fails immediately with "Failed to find package 'tools'" (SDK package
+      # renamed), and the preinstalled cmdline-tools do the same job.
       - name: Install compileSdk 34 platform and build-tools
-        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          export PATH="$SDK/cmdline-tools/latest/bin:$SDK/platform-tools:$PATH"
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
 
       # The checkout has no SDK path; AGP refuses to configure without one.
       # $ANDROID_HOME is exported by setup-android.
@@ -152,10 +160,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
-
+      # ubuntu-latest already ships the Android SDK at /usr/local/lib/android/sdk.
+      # android-actions/setup-android@v3 is not used: on the current runner image
+      # it fails immediately with "Failed to find package 'tools'" (SDK package
+      # renamed), and the preinstalled cmdline-tools do the same job.
       - name: Install compileSdk 34 platform and build-tools
-        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          export PATH="$SDK/cmdline-tools/latest/bin:$SDK/platform-tools:$PATH"
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
 
       - name: Point Gradle at the runner's SDK
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
