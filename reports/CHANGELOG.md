@@ -4,8 +4,8 @@ Những thay đổi của **bản fork VUDEV ANDEE 2** so với upstream **Andee
 
 - **Mốc upstream**: `81589d6` — `chore(release): v0.15.0` (12/11/2026).
 - **Đầu nhánh `main` của fork**: `4a66230` — `feat: add Vietnamese language support and update LLM defaults` (16/11/2026).
-- **Trạng thái tài liệu này**: viết ngày **16/11/2026**, khi Trung tâm AI và các thay đổi bảo mật còn nằm trong **worktree chưa commit**. Mục nào ghi "đang hoàn thiện" thì hãy đối chiếu `git status` / `git log` trước khi coi là đã phát hành.
-- **Chưa có bản phát hành VUDEV ANDEE 2.** `versionName` vẫn là `0.15.0`, `versionCode` vẫn là `30` — build từ `main` báo cùng số phiên bản với upstream. Nhận diện build bằng mã commit, không bằng số phiên bản.
+- **Trạng thái tài liệu này**: viết ngày **16/11/2026**, sau khi Trung tâm AI, các thay đổi bảo mật và bộ tài liệu tiếng Việt đã được commit trên nhánh main (69ed0a4, 1dd4b7a, b300d8d, d872a69, cùng các commit báo cáo sau đó). Muốn biết chính xác trạng thái, đối chiếu git log. Mục nào ghi "đang hoàn thiện" thì hãy đối chiếu `git status` / `git log` trước khi coi là đã phát hành.
+- **Chưa có tag/bản release VUDEV ANDEE 2.** `versionName` vẫn là `0.15.0`, `versionCode` vẫn là `30` — build từ `main` báo cùng số phiên bản với upstream. Nhận diện build bằng mã commit, không bằng số phiên bản.
 
 Định dạng tham khảo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/). Chính sách phiên bản gốc nằm ở [CHANGELOG.md](../CHANGELOG.md) của upstream.
 
@@ -18,11 +18,11 @@ Những thay đổi của **bản fork VUDEV ANDEE 2** so với upstream **Andee
 | Giao diện tiếng Việt mặc định | ✅ Đã commit | `4a66230`, `app/src/main/res/values-vi/` |
 | Đổi mặc định mô hình / chế độ bộ não | ✅ Đã commit | `4a66230`, `VoiceConfig.kt` |
 | Build: ký debug + tắt ABI splits + Gradle 9.3.1 | ✅ Đã commit | `4a66230`, `app/build.gradle`, `gradle/wrapper/` |
-| Trung tâm AI (Provider Center) | 🚧 Worktree, chưa commit | `provider/`, `ProviderStore.kt`, `ProviderUi.kt` |
-| Khoá mã hoá bằng Keystore (SecretBox) | 🚧 Worktree, chưa commit | `security/SecretBox.kt`, `VoiceConfig.kt` |
-| Token WebSocket (mặc định bật) | 🚧 Worktree, chưa commit | `BodyWsServer.kt`, `SettingsUi.kt` |
-| Cỡ chữ cho giao diện nổi | 🚧 Worktree, chưa commit | `AppLocale.kt`, `BodyCoreService.kt` |
-| Bộ tài liệu tiếng Việt | 🚧 Worktree, chưa commit | các tệp trong mục "Tài liệu" |
+| Trung tâm AI (Provider Center) | ✅ Đã commit (nhánh main) | `provider/`, `ProviderStore.kt`, `ProviderUi.kt` |
+| Khoá mã hoá bằng Keystore (SecretBox) | ✅ Đã commit (nhánh main) | `security/SecretBox.kt`, `VoiceConfig.kt` |
+| Token WebSocket (mặc định bật) | ✅ Đã commit (nhánh main) | `BodyWsServer.kt`, `SettingsUi.kt` |
+| Cỡ chữ cho giao diện nổi | ✅ Đã commit (nhánh main) | `AppLocale.kt`, `BodyCoreService.kt` |
+| Bộ tài liệu tiếng Việt | ✅ Đã commit (nhánh main) | các tệp trong mục "Tài liệu" |
 | Phát hành chính thức | ❌ Chưa có | chưa có tag/bản release của fork |
 
 ---
@@ -67,7 +67,7 @@ Những thay đổi của **bản fork VUDEV ANDEE 2** so với upstream **Andee
 
 ---
 
-### Đang hoàn thiện — worktree, chưa commit (tại 16/11/2026)
+### Đã commit trên nhánh main (16/11/2026)
 
 Các mục dưới đây **có mã trong worktree** nhưng chưa nằm trong commit nào. Nếu bạn đang đọc sau khi chúng đã được commit, hãy coi trạng thái là "đã xong"; nếu không thấy mã, đừng coi là có.
 
@@ -106,7 +106,7 @@ Các mục dưới đây **có mã trong worktree** nhưng chưa nằm trong com
 
 #### Tài liệu (đợt này)
 
-Đang tạo, chưa commit:
+Đã tạo và commit:
 
 - `README.vi.md` — trang đầu tiếng Việt, liên kết bản tiếng Anh, giấy phép, tính năng, đường dẫn tài liệu.
 - `docs/INSTALL.md` — cài APK trên điện thoại thật, HyperOS/Redmi, adb.

@@ -1066,4 +1066,5 @@
     <string name="settings_pause_off">Đang chạy</string>
     <string name="settings_pause_on">Tạm dừng</string>
     <string name="settings_pause_note">Khi tạm dừng, mọi câu lệnh mới bị từ chối và trợ lý không thao tác gì thêm. Bật lại bất cứ lúc nào.</string>
+    <string name="codeflying_url" translatable="false">https://www.codeflying.app/andee</string>
 </resources>
