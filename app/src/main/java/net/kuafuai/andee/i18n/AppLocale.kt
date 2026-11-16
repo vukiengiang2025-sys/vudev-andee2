@@ -78,6 +78,22 @@ object AppLocale {
         return context.createConfigurationContext(config)
     }
 
+    /**
+     * [context] with the user's text size applied to its configuration, for the two services'
+     * attachBaseContext.
+     *
+     * The cards build their views on the Service Context, so scaling has to happen before any view
+     * exists; that is why this is not part of [wrap] (which only changes the language of the strings).
+     * A size change therefore takes effect the next time the body starts, which the settings row says.
+     */
+    fun withTextScale(context: Context): Context {
+        val scale = net.kuafuai.andee.config.VoiceConfig.textScale(context)
+        if (scale == 1f) return context
+        val config = Configuration(context.resources.configuration)
+        config.fontScale = (config.fontScale * scale).coerceIn(0.85f, 2.0f)
+        return context.createConfigurationContext(config)
+    }
+
     /** One string, in the user's language. For call sites with no Context to keep. */
     fun str(context: Context, id: Int): String = wrap(context).getString(id)
 

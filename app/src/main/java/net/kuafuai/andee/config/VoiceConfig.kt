@@ -236,8 +236,7 @@ object VoiceConfig {
          * [BuildConfig.CODEFLYING_KEY] from local.properties.
          */
         fun codeFlyingKey(context: Context): String =
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getString("codeflying_key", "").orEmpty().trim()
+            secretPref(context, "codeflying_key").trim()
                 .ifEmpty { codeFlyingBuiltInKey(context) }
 
         /** The key that came with the APK, ignoring anything typed. */
@@ -391,6 +390,27 @@ object VoiceConfig {
                         ?.trim()?.lowercase() != "disabled",
                     reasoningEffort = p.getString("llm_reasoning_effort", DEFAULT_REASONING_EFFORT)
                         .orEmpty().trim().ifEmpty { DEFAULT_REASONING_EFFORT },
+                )
+            }
+            // The AI Provider Center's active record is the source of truth for the local brain.
+            // It was seeded from these same llm_* fields on first use, so an install that never
+            // opened the center resolves to exactly what it always did.
+            val stored = ProviderStore.activeEndpoint(context)
+            if (stored != null) {
+                return BrainConfig(
+                    mode = mode,
+                    apiKey = stored.apiKey,
+                    baseUrl = stored.resolvedBaseUrl,
+                    model = stored.resolvedModel,
+                    thinking = stored.thinking,
+                    reasoningEffort = stored.reasoningEffort,
+                    providerId = stored.provider.id,
+                    temperature = stored.temperature,
+                    topP = stored.topP,
+                    maxOutputTokens = stored.maxOutputTokens,
+                    readTimeoutSeconds = stored.timeoutSeconds,
+                    maxRetries = stored.maxRetries,
+                    fallback = ProviderStore.fallbackEndpoint(context),
                 )
             }
             // Language-dependent defaults: the blank-row fallback must be the
@@ -553,8 +573,8 @@ object VoiceConfig {
                 VOICE_SYSTEM -> VOICE_SYSTEM
                 VOICE_HUOSHAN -> VOICE_HUOSHAN
                 "" -> {
-                    val hasVolc = prefs.getString("api_key", "").orEmpty().isNotBlank() || API_KEY.isNotBlank()
-                    val hasGoogle = prefs.getString("google_api_key", "").orEmpty().isNotBlank() ||
+                    val hasVolc = secretPref(context, "api_key").isNotBlank() || API_KEY.isNotBlank()
+                    val hasGoogle = secretPref(context, "google_api_key").isNotBlank() ||
                         googleApiKeyDefault().isNotBlank()
                     if (hasVolc || hasGoogle) voiceProvider(context) else VOICE_SYSTEM
                 }
@@ -570,8 +590,7 @@ object VoiceConfig {
          * card prints it, and the service logs it at start.
          */
         fun usingOwnCredentials(context: Context): Boolean =
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getString("api_key", "").orEmpty().isNotBlank()
+            secretPref(context, "api_key").isNotBlank()
 
         fun load(context: Context): VoiceSettings {
             val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -587,7 +606,7 @@ object VoiceConfig {
             val codeFlying = brainMode(context) == BRAIN_CODEFLYING
             return VoiceSettings(
                 apiKey = if (codeFlying) codeFlyingKey(context)
-                else p.getString("api_key", "").orEmpty().trim().ifEmpty { API_KEY },
+                else secretPref(context, "api_key").trim().ifEmpty { API_KEY },
                 asrEndpoint = if (codeFlying) codeFlyingAsrEndpoint(context)
                 else p.getString("asr_endpoint", null)
                     ?.takeIf { it.isNotEmpty() }
@@ -609,7 +628,7 @@ object VoiceConfig {
                 // card's hint under each row is the same call — see
                 // [googleApiKeyDefault]. On a build with nothing baked in that
                 // reduces to exactly what it was before: the constants.
-                googleApiKey = p.getString("google_api_key", "").orEmpty().trim()
+                googleApiKey = secretPref(context, "google_api_key").trim()
                     .ifEmpty { googleApiKeyDefault() },
                 googleBaseUrl = p.getString("google_base_url", "").orEmpty().trim()
                     .trimEnd('/').ifEmpty { googleBaseUrlDefault() },
@@ -644,6 +663,19 @@ object VoiceConfig {
                 // pin the build's key as a user override: store only a different one.
                 if (k == "codeflying_key" && v.trim() == codeFlyingBuiltInKey(context)) {
                     p.remove(k)
+                    p.remove(k + "_sealed")
+                    continue
+                }
+                // Credentials are sealed with the Android Keystore, never written as plain text. The
+                // plain key is removed in the same commit, so an upgrade leaves no readable copy behind.
+                if (k in SECRET_KEYS) {
+                    if (v.isBlank()) {
+                        p.remove(k)
+                        p.remove(k + "_sealed")
+                    } else {
+                        p.putString(k + "_sealed", net.kuafuai.andee.security.SecretBox.seal(v.trim()).orEmpty())
+                        p.remove(k)
+                    }
                     continue
                 }
                 if (k in OVERRIDE_KEYS) {
@@ -673,7 +705,7 @@ object VoiceConfig {
                 // asr_endpoint/tts_endpoint joined api_key here: they are also
                 // overridable from local.properties now, so the settings card
                 // must show saved-or-empty rather than saved-or-default.
-                "api_key" to p.getString("api_key", "").orEmpty(),
+                "api_key" to secretPref(context, "api_key"),
                 "codeflying_key" to codeFlyingKey(context),
                 "asr_endpoint" to p.getString("asr_endpoint", "").orEmpty(),
                 "asr_resource_id" to p.getString("asr_resource_id", DEFAULT_ASR_RESOURCE)!!,
@@ -688,7 +720,7 @@ object VoiceConfig {
                 // seen at all.
                 "voice_provider" to voiceProvider(context),
                 "speak_provider" to speakProvider(context),
-                "google_api_key" to p.getString("google_api_key", "").orEmpty(),
+                "google_api_key" to secretPref(context, "google_api_key"),
                 "google_base_url" to p.getString("google_base_url", "").orEmpty(),
                 "google_project" to p.getString("google_project", "").orEmpty(),
                 "google_location" to p.getString("google_location", "").orEmpty(),
@@ -734,6 +766,9 @@ object VoiceConfig {
                 "drive" to if (driveEnabled(context)) "on" else "off",
                 "timeline_events" to if (timelineEvents(context)) "on" else "off",
                 "lang" to uiLanguage(context),
+                // Shown as a picker, so it round-trips as the wire words rather than a boolean.
+                "ws_auth" to if (wsAuthEnabled(context)) "on" else "off",
+                "paused" to if (agentPaused(context)) "on" else "off",
                 "sweep" to p.getString("sweep", "on")!!,
                 "sweep_quiet_minutes" to p.getString(
                     "sweep_quiet_minutes", DEFAULT_SWEEP_QUIET_MINUTES.toString(),
@@ -873,9 +908,145 @@ object VoiceConfig {
             if (petOn(context)) net.kuafuai.andee.pet.PetCharacters.byId(petCharacter(context))?.voice.orEmpty()
             else net.kuafuai.andee.ui.ball.BallLooks.byName(ballLook(context)).voice
 
-        fun characterPersona(context: Context): String =
-            if (petOn(context)) net.kuafuai.andee.pet.PetCharacters.byId(petCharacter(context))?.persona.orEmpty()
+        fun characterPersona(context: Context): String {
+            val look = if (petOn(context)) net.kuafuai.andee.pet.PetCharacters.byId(petCharacter(context))?.persona.orEmpty()
             else net.kuafuai.andee.ui.ball.BallLooks.byName(ballLook(context)).persona
+            return look + personalPersona(context)
+        }
+
+        /**
+         * The user's own words about who this assistant is, appended to whatever character the ball wears.
+         *
+         * Kept out of the look on purpose: a look is a delivery style and is shared by every user of it,
+         * while a name, an address form and a house rule belong to one person. Written in Vietnamese and
+         * fenced as subordinate to the prompt above it when [net.kuafuai.andee.brain.LocalPrompt.withPersona]
+         * wraps it, so a house style cannot turn into a permission.
+         */
+        fun personalPersona(context: Context): String {
+            val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val name = p.getString("persona_name", "").orEmpty().trim()
+            val address = p.getString("persona_address", "").orEmpty().trim()
+            val style = p.getString("persona_style", "").orEmpty().trim()
+            val extra = p.getString("persona_extra", "").orEmpty().trim()
+            if (name.isEmpty() && address.isEmpty() && style.isEmpty() && extra.isEmpty()) return ""
+            val sb = StringBuilder("\n\n### Riêng của người dùng\n\n")
+            if (name.isNotEmpty()) sb.append("Tên bạn là ").append(name).append(". Khi tự giới thiệu, dùng tên này.\n")
+            if (address.isNotEmpty()) sb.append("Xưng hô với người dùng: ").append(address).append(".\n")
+            if (style.isNotEmpty()) sb.append("Phong cách trả lời: ").append(style).append(".\n")
+            if (extra.isNotEmpty()) sb.append("Yêu cầu thêm của người dùng: ").append(extra).append("\n")
+            return sb.toString()
+        }
+
+        /**
+         * Whether the LAN socket (port 9008) demands the token. On unless the user turns it off.
+         *
+         * On by default because the socket can drive the screen: before this, anyone on the same Wi-Fi
+         * could open it. Loopback is always exempt, so `adb forward` and the debug tools keep working
+         * without the token.
+         */
+        fun wsAuthEnabled(context: Context): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("ws_auth", "on") != "off"
+
+        fun setWsAuthEnabled(context: Context, on: Boolean) =
+            save(context, mapOf("ws_auth" to if (on) "on" else "off"))
+
+        /** The shared secret for the LAN socket, generated once and stored sealed. */
+        fun wsToken(context: Context): String {
+            val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val sealed = p.getString("ws_token_sealed", "").orEmpty()
+            net.kuafuai.andee.security.SecretBox.open(sealed)?.takeIf { it.isNotBlank() }?.let { return it }
+            val fresh = newWsToken()
+            p.edit().putString("ws_token_sealed", net.kuafuai.andee.security.SecretBox.seal(fresh).orEmpty())
+                .remove("ws_token").apply()
+            return fresh
+        }
+
+        /** Throw the old token away. Every paired driver has to be told the new one. */
+        fun regenerateWsToken(context: Context): String {
+            val fresh = newWsToken()
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString("ws_token_sealed", net.kuafuai.andee.security.SecretBox.seal(fresh).orEmpty())
+                .remove("ws_token").apply()
+            return fresh
+        }
+
+        private fun newWsToken(): String {
+            val bytes = ByteArray(18)
+            java.security.SecureRandom().nextBytes(bytes)
+            return android.util.Base64.encodeToString(
+                bytes,
+                android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING,
+            )
+        }
+
+        /**
+         * A BrainConfig for one of the AI Provider Center's roles (coding, vision, cheap...), or null when
+         * that role was never given a provider.
+         *
+         * This is how a role stops being a label and starts doing something: the locator asks for VISION,
+         * the notification triage asks for CHEAP, and both get a working endpoint instead of the main one.
+         */
+        fun brainConfigForRole(context: Context, role: net.kuafuai.andee.brain.provider.ModelRole): BrainConfig? {
+            val ep = ProviderStore.endpointForRole(context, role) ?: return null
+            return BrainConfig(
+                mode = brainMode(context),
+                apiKey = ep.apiKey,
+                baseUrl = ep.resolvedBaseUrl,
+                model = ep.resolvedModel,
+                thinking = ep.thinking,
+                reasoningEffort = ep.reasoningEffort,
+                providerId = ep.provider.id,
+                temperature = ep.temperature,
+                topP = ep.topP,
+                maxOutputTokens = ep.maxOutputTokens,
+                readTimeoutSeconds = ep.timeoutSeconds,
+                maxRetries = ep.maxRetries,
+            )
+        }
+
+        /**
+         * The user's pause switch: while on, a new turn is refused instead of run.
+         *
+         * Deliberately checked at the one place a turn is submitted, not inside a tool: a pause that lets
+         * the assistant finish three more taps is not a pause. The switch is on the settings card and in
+         * the self-check page so it is reachable when the ball is misbehaving.
+         */
+        fun agentPaused(context: Context): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("paused", "off") == "on"
+
+        fun setAgentPaused(context: Context, paused: Boolean) =
+            save(context, mapOf("paused" to if (paused) "on" else "off"))
+
+        /** Keys that are sealed with the Keystore instead of being written as text. */
+        private val SECRET_KEYS = setOf("api_key", "google_api_key", "codeflying_key")
+
+        /**
+         * A credential from its sealed form, falling back to a legacy plain-text value once and migrating it.
+         *
+         * Returns "" when the blob cannot be decrypted (another install's backup, a reset Keystore) rather
+         * than the ciphertext or a crash: the row then reads as "no key" and the user is asked again.
+         */
+        private fun secretPref(context: Context, key: String): String {
+            val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val sealed = p.getString(key + "_sealed", "").orEmpty()
+            if (sealed.isNotEmpty()) return net.kuafuai.andee.security.SecretBox.open(sealed).orEmpty()
+            val plain = p.getString(key, "").orEmpty()
+            if (plain.isNotEmpty()) {
+                p.edit()
+                    .putString(key + "_sealed", net.kuafuai.andee.security.SecretBox.seal(plain).orEmpty())
+                    .remove(key)
+                    .apply()
+            }
+            return plain
+        }
+
+        /** 0.85 – 1.35; 1.0 when the user never picked a size. Applied at service attach (see AppLocale). */
+        fun textScale(context: Context): Float =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("text_scale", "")?.trim()?.toFloatOrNull()?.coerceIn(0.85f, 1.35f) ?: 1f
+
+        fun setTextScale(context: Context, scale: Float) =
+            save(context, mapOf("text_scale" to scale.coerceIn(0.85f, 1.35f).toString()))
 
         /**
          * Whether the wake phrase is still listened for with the screen off.
@@ -1086,6 +1257,10 @@ object VoiceConfig {
             "show_hub",
             "llm_api_key", "llm_base_url", "llm_model",
             "llm_thinking", "llm_reasoning_effort",
+            "text_scale",
+            "persona_name", "persona_address", "persona_style", "persona_extra",
+            "ws_auth",
+            "paused",
             "grounding",
             "notify",
             "nudge",

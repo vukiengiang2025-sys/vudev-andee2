@@ -20,6 +20,7 @@ import androidx.annotation.StringRes
 import net.kuafuai.andee.R
 import net.kuafuai.andee.config.FactoryReset
 import net.kuafuai.andee.config.Notebook
+import net.kuafuai.andee.config.ProviderStore
 import net.kuafuai.andee.config.Vault
 import net.kuafuai.andee.config.VoiceConfig
 import net.kuafuai.andee.i18n.AppLocale
@@ -457,6 +458,8 @@ class SettingsUi(
         // see [expressionsSection] — and a door that most users never open belongs
         // behind the disclosure rather than in the column everyone scrolls.
         showHubSection(body)
+        personaSection(body)
+        securitySection(body)
         typingSection(body)
         diagnosticsSection(body)
     }
@@ -467,6 +470,56 @@ class SettingsUi(
      * writes eagerly and rebuilds the whole card, so flipping it on and
      * scrolling back up finds the 云端 tab already in the backend picker.
      */
+    /**
+     * The LAN socket's front door, plus the token it now asks for.
+     *
+     * Before this, port 9008 accepted any connection on the Wi-Fi: reading the screen, tapping, typing.
+     * The token is generated here rather than typed by the user, because a secret a person invents is a
+     * secret they reuse. Copy hands it to a paired hub; regenerate invalidates every old client at once.
+     */
+    private fun securitySection(form: LinearLayout) {
+        val panel = group(
+            form,
+            lctx.getString(R.string.settings_security_section),
+            lctx.getString(R.string.settings_security_note),
+        )
+        // The pause switch lives here rather than in 危险区: it is reversible in one tap, and the moment a
+        // user wants it is the moment the assistant is doing something they did not ask for.
+        rowLabel(panel, lctx.getString(R.string.settings_pause))
+        segmented(panel, "paused", listOf("off" to lctx.getString(R.string.settings_pause_off), "on" to lctx.getString(R.string.settings_pause_on))) {
+            VoiceConfig.setAgentPaused(context, it == "on")
+            rebuild()
+        }
+        note(panel, lctx.getString(R.string.settings_pause_note))
+        rowLabel(panel, lctx.getString(R.string.settings_ws_auth))
+        segmented(panel, "ws_auth", listOf("on" to lctx.getString(R.string.common_on), "off" to lctx.getString(R.string.common_off))) {
+            VoiceConfig.setWsAuthEnabled(context, it == "on")
+            rebuild()
+        }
+        note(panel, lctx.getString(R.string.settings_ws_auth_note))
+        if (VoiceConfig.wsAuthEnabled(context)) {
+            rowLabel(panel, lctx.getString(R.string.settings_ws_token))
+            note(panel, VoiceConfig.wsToken(context))
+            val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+            row.addView(button(lctx.getString(R.string.settings_ws_token_copy), filled = false) {
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("andee ws token", VoiceConfig.wsToken(context)))
+                toast(lctx.getString(R.string.settings_ws_token_copied))
+            }, LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginEnd = dp(8) })
+            row.addView(button(lctx.getString(R.string.settings_ws_token_regen), filled = false) {
+                VoiceConfig.regenerateWsToken(context)
+                rebuild()
+            }, LinearLayout.LayoutParams(0, WRAP, 1f))
+            panel.addView(row, rowParams(dp(10)))
+            note(panel, lctx.getString(R.string.settings_ws_token_note))
+        }
+    }
+
+    /** A one-line confirmation, so a copy that worked does not look like a dead button. */
+    private fun toast(text: String) {
+        android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
+    }
+
     private fun showHubSection(form: LinearLayout) {
         val panel = group(
             form,
@@ -690,6 +743,27 @@ class SettingsUi(
 
         // ---- 本机 tab: LLM + 火山 voice rows ----
         val localBlock = block(panel)
+        // The AI Provider Center owns the local brain's endpoint. When a record exists (which is always,
+        // after the store seeds itself from these same legacy fields), this tab shows that record instead
+        // of the three raw rows: two places writing one endpoint is how a user ends up editing a key that
+        // is no longer in use.
+        val activeProvider = ProviderStore.active(context)
+        if (activeProvider != null) {
+            rowLabel(localBlock, lctx.getString(R.string.provider_active_title))
+            note(localBlock, activeProvider.label.ifBlank { activeProvider.provider.label } + " · " + activeProvider.resolvedModel)
+            note(localBlock, activeProvider.resolvedBaseUrl)
+            ProviderStore.fallback(context)?.let { fb ->
+                note(localBlock, lctx.getString(
+                    R.string.provider_active_fallback,
+                    fb.label.ifBlank { fb.provider.label } + " · " + fb.resolvedModel,
+                ))
+            }
+            localBlock.addView(button(lctx.getString(R.string.provider_open_center), filled = true) {
+                ProviderUi(context, onChanged = { rebuild() }).show()
+            }, rowParams(10))
+            note(localBlock, lctx.getString(R.string.provider_managed_note))
+        }
+        if (activeProvider == null) {
         // The hint *is* the value a blank row resolves to, so the hint and the
         // resolved config come from the same language-aware pair — see
         // [VoiceConfig.llmModelDefault]. An English card advertises an OpenAI
@@ -935,6 +1009,7 @@ class SettingsUi(
             Glass.setVisible(effortBlock, th != "disabled", animate)
         }
         applyThinking(thinking, false)
+        }
     }
 
     /**
@@ -969,6 +1044,54 @@ class SettingsUi(
             rebuild()
         }
         panel.addView(row, rowParams(dp(7)))
+
+        // Text size. Applied at service attach (see AppLocale.withTextScale), so the row says what the
+        // user has to do to see it — a size picker that redraws the card at the OLD size would read broken.
+        rowLabel(panel, lctx.getString(R.string.settings_text_scale))
+        val scale = VoiceConfig.textScale(context)
+        val picked = when {
+            scale <= 0.925f -> "0.9"
+            scale <= 1.075f -> "1.0"
+            scale <= 1.225f -> "1.15"
+            else -> "1.3"
+        }
+        val sizeRow = segments(
+            options = listOf(
+                "0.9" to lctx.getString(R.string.settings_text_scale_small),
+                "1.0" to lctx.getString(R.string.settings_text_scale_normal),
+                "1.15" to lctx.getString(R.string.settings_text_scale_large),
+                "1.3" to lctx.getString(R.string.settings_text_scale_xlarge),
+            ),
+            picked = picked,
+            radius = dp(13),
+        ) { v ->
+            VoiceConfig.setTextScale(context, v.toFloatOrNull() ?: 1f)
+            rebuild()
+        }
+        panel.addView(sizeRow, rowParams(dp(7)))
+        note(panel, lctx.getString(R.string.settings_text_scale_note))
+    }
+
+    /**
+     * Who the assistant is: name, how it addresses the user, and any house rule.
+     *
+     * Stored as plain text and appended to the character persona at prompt-build time
+     * ([VoiceConfig.personalPersona]); it is not a permission and cannot override the guard.
+     */
+    private fun personaSection(form: LinearLayout) {
+        val panel = group(
+            form,
+            lctx.getString(R.string.settings_persona_title),
+            lctx.getString(R.string.settings_persona_note),
+        )
+        field(panel, "persona_name", lctx.getString(R.string.settings_persona_name),
+            hint = lctx.getString(R.string.settings_persona_name_hint))
+        field(panel, "persona_address", lctx.getString(R.string.settings_persona_address),
+            hint = lctx.getString(R.string.settings_persona_address_hint))
+        field(panel, "persona_style", lctx.getString(R.string.settings_persona_style),
+            hint = lctx.getString(R.string.settings_persona_style_hint))
+        field(panel, "persona_extra", lctx.getString(R.string.settings_persona_extra),
+            hint = lctx.getString(R.string.settings_persona_extra_hint))
     }
 
     /**

@@ -1309,8 +1309,17 @@ class CommandDispatcher(
             "screen.tap_target" -> {
                 val target = params?.optString("target")?.trim().orEmpty()
                 require(target.isNotEmpty()) { "tap_target requires target — the element to tap, described in words" }
-                val cfg = VoiceConfig.brainConfig(appContext)
-                val model = net.kuafuai.andee.brain.Locator.modelFor(cfg, VoiceConfig.locatorModel(appContext))
+                // The vision role, when the user gave it a provider; otherwise the main brain, which is what
+                // every install did before roles existed.
+                val visionCfg = VoiceConfig.brainConfigForRole(
+                    appContext,
+                    net.kuafuai.andee.brain.provider.ModelRole.VISION,
+                )
+                val cfg = visionCfg ?: VoiceConfig.brainConfig(appContext)
+                val model = net.kuafuai.andee.brain.Locator.modelFor(
+                    cfg,
+                    if (visionCfg != null) "" else VoiceConfig.locatorModel(appContext),
+                )
                     ?: throw IllegalStateException("No locating model is available on this backend. Use tap_screen_element or tap_by_coordinates (zoom first).")
                 // No grid: the lines and rulers are for an eye that counts cells, and only get in a pointing model's way.
                 val shot = blankedForCapture { requireScreen().screenshot("locate", grid = false) }

@@ -37,6 +37,11 @@ import java.util.concurrent.atomic.AtomicReference
  */
 class ScreenBodyService : AccessibilityService() {
 
+    /** The user's text size, applied before this service's views exist. See BodyCoreService.attachBaseContext. */
+    override fun attachBaseContext(base: android.content.Context) {
+        super.attachBaseContext(net.kuafuai.andee.i18n.AppLocale.withTextScale(base))
+    }
+
     override fun onServiceConnected() {
         instanceRef.set(this)
         // The manifest requests touch-exploration capability because some

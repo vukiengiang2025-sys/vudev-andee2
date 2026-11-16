@@ -71,6 +71,15 @@ import java.util.concurrent.atomic.AtomicReference
  */
 class BodyCoreService : Service() {
 
+    /**
+     * Apply the user's text size before any view exists. The cards are built on this Context, so this is the
+     * only place a scale can reach every label at once; see AppLocale.withTextScale for why the setting
+     * takes effect when the body next starts.
+     */
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(net.kuafuai.andee.i18n.AppLocale.withTextScale(base))
+    }
+
     private val ui = Handler(Looper.getMainLooper())
     private lateinit var window: FloatingWindowUi
     private lateinit var ripple: EdgeRippleUi
@@ -1172,6 +1181,11 @@ class BodyCoreService : Service() {
      */
     private fun submitUserTurn(text: String, how: String, images: List<String> = emptyList()) {
         if (exitRequested) return
+        if (net.kuafuai.andee.config.VoiceConfig.agentPaused(this)) {
+            // Shown but not spoken: a pause switch that lets the voice answer is only half a switch.
+            window.setSubtitle(net.kuafuai.andee.i18n.AppLocale.str(this, R.string.paused_turn_refused))
+            return
+        }
         val said = text.trim()
         if (said.isEmpty() && images.isEmpty()) return
         // Typing the exit phrase exits locally, exactly as speaking it does (the voice path matches it in
@@ -2997,6 +3011,13 @@ class BodyCoreService : Service() {
                 // path went unexercised; this runs the same code the alarm does.
                 onSweep = { ui.post { onSweepTimer() } },
                 onSweepForced = { ui.post { localBrain?.runSweep() } },
+                // The token is generated on first use and stored sealed. Loopback (adb forward) is exempt
+                // inside the server, so a developer is not asked for it.
+                authToken = if (net.kuafuai.andee.config.VoiceConfig.wsAuthEnabled(this)) {
+                    net.kuafuai.andee.config.VoiceConfig.wsToken(this)
+                } else {
+                    ""
+                },
             )
             srv.start()
             wsServer = srv
@@ -4087,7 +4108,14 @@ class BodyCoreService : Service() {
         val scene = if (localBrain == null) null
         else net.kuafuai.andee.config.VoiceConfig.activeScene(this)
             ?.let { net.kuafuai.andee.config.Notebook.scene(this, it) }
-        val verdict = net.kuafuai.andee.brain.NotificationTriage(bc) { warn, msg ->
+        // The cheap role is the whole point of roles for this call: triage is one line of judgement
+        // ~500 tokens in, and it runs on every notification. Falling back to the main endpoint keeps a
+        // device that never opened the Provider Center exactly as it was.
+        val triageCfg = net.kuafuai.andee.config.VoiceConfig
+            .brainConfigForRole(this, net.kuafuai.andee.brain.provider.ModelRole.CHEAP)
+            ?.takeIf { it.apiKey.isNotEmpty() }
+            ?: bc
+        val verdict = net.kuafuai.andee.brain.NotificationTriage(triageCfg) { warn, msg ->
             if (warn) android.util.Log.w("Brain", msg) else android.util.Log.i("Brain", msg)
         }
             .decide(

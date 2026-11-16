@@ -7,6 +7,7 @@ import org.java_websocket.server.WebSocketServer
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.InetSocketAddress
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArraySet
@@ -82,10 +83,26 @@ class BodyWsServer(
 
     /** `debug.sweep {"skip":true}` — the review with the silence gate bypassed. */
     private val onSweepForced: () -> Unit = {},
+
+    /**
+     * The shared secret this socket demands before it will take a request. Empty = no auth (a user who
+     * turned the switch off, or a build that predates it).
+     *
+     * Why it is a constructor value rather than read here: this class lives in net/ and must not reach
+     * into settings; the service resolves the user's choice once and hands it over.
+     *
+     * Loopback connections are always accepted: that is what `adb forward` arrives as, and the phone's
+     * owner is the one holding the cable. A LAN peer has to send the token, which is the whole point —
+     * the socket can drive the screen, and before this it could be opened by anyone on the same Wi-Fi.
+     */
+    private val authToken: String = "",
 ) : WebSocketServer(InetSocketAddress(bindHost, port)) {
 
     /** Driver connections only — the ones broadcasts go to. Extensions never join. */
     private val active = CopyOnWriteArraySet<WebSocket>()
+
+    /** Connections that passed the token check (or arrived over loopback). */
+    private val authorized = CopyOnWriteArraySet<WebSocket>()
 
     /**
      * In-flight reverse-requests we sent to the extension, keyed by envelope
@@ -101,12 +118,28 @@ class BodyWsServer(
     override fun onOpen(conn: WebSocket, handshake: ClientHandshake?) {
         // Provisionally treat every new connection as a driver. If a register
         // frame arrives naming role=call_extension, we lift it back out.
-        active.add(conn)
-        Log.d(TAG, "onOpen ${conn.remoteSocketAddress} drivers=${active.size}")
+        val loopback = conn.remoteSocketAddress?.address?.isLoopbackAddress == true
+        val fromQuery = runCatching {
+            handshake?.resourceDescriptor.orEmpty().substringAfter("token=", "").substringBefore("&")
+        }.getOrDefault("")
+        // Loopback needs no token: that is what adb forward arrives as, and the cable is already the
+        // credential. A LAN peer must present one — unless the user turned the requirement off.
+        if (authToken.isBlank() || loopback || tokenMatches(fromQuery)) {
+            authorized.add(conn)
+            active.add(conn)
+        }
+        Log.d(TAG, "onOpen " + conn.remoteSocketAddress + " authorized=" + authorized.contains(conn) + " drivers=" + active.size)
+    }
+
+    /** Constant-time compare: a token guessed byte-by-byte must not learn its length from timing. */
+    private fun tokenMatches(candidate: String): Boolean {
+        if (authToken.isBlank() || candidate.isEmpty()) return false
+        return MessageDigest.isEqual(candidate.toByteArray(), authToken.toByteArray())
     }
 
     override fun onClose(conn: WebSocket, code: Int, reason: String?, remote: Boolean) {
         active.remove(conn)
+        authorized.remove(conn)
         if (registry.unregister(conn)) {
             Log.i(TAG, "call extension disconnected: ${conn.remoteSocketAddress} code=$code reason=$reason")
             // Nothing to talk to for any request we sent out — wake them all
@@ -120,7 +153,21 @@ class BodyWsServer(
     override fun onMessage(conn: WebSocket, message: String) {
         val msg = runCatching { JSONObject(message) }.getOrNull()
         if (msg == null) {
-            Log.w(TAG, "non-JSON message ignored: ${message.take(100)}")
+            Log.w(TAG, "non-JSON message ignored: " + message.take(100))
+            return
+        }
+        // Unauthorised connections get exactly one chance: an auth frame carrying the token. Anything
+        // else closes the socket — the first request is far too late to be deciding this.
+        if (conn !in authorized) {
+            if (msg.optString("type") == "auth" && tokenMatches(msg.optString("token"))) {
+                authorized.add(conn)
+                active.add(conn)
+                runCatching { conn.send(JSONObject().put("type", "auth").put("ok", true).toString()) }
+                Log.i(TAG, "ws client authorized: " + conn.remoteSocketAddress)
+            } else {
+                Log.w(TAG, "ws client without a valid token refused: " + conn.remoteSocketAddress)
+                runCatching { conn.close(4001, "unauthorized") }
+            }
             return
         }
         when (msg.optString("type")) {
