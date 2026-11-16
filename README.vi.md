@@ -91,6 +91,11 @@ Giấy phép của dự án gốc **cấm xoá hoặc che tên sản phẩm, bi�
 
 ---
 
+## Tải APK
+
+- **Bản phát hành (tải trực tiếp):** https://github.com/vukiengiang2025-sys/vudev-andee2/releases — tệp app-debug.apk, ký bằng khoá debug của kho.
+- **Artifact từ GitHub Actions:** tab Actions, workflow build-apk, mục Artifacts, tệp app-debug.
+
 ## Cài đặt nhanh
 
 Chi tiết đầy đủ cho điện thoại thật (kể cả Redmi 15 5G / HyperOS) ở **[docs/INSTALL.md](docs/INSTALL.md)**.

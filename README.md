@@ -4,6 +4,7 @@
 
 Andee sống trong điện thoại như một "cơ thể": bóng nổi trên màn hình, dùng AccessibilityService để nhìn và thao tác ứng dụng, nghe bằng micro, nói bằng TTS, ghi nhớ bằng notebook riêng. VUDEV ANDEE 2 phát triển từ nền đó, ưu tiên tiếng Việt và khả năng chọn nhà cung cấp AI.
 
+- **Tải APK bản dựng thử:** [GitHub Releases](https://github.com/vukiengiang2025-sys/vudev-andee2/releases) (tệp app-debug.apk, ký bằng khoá debug của kho) hoặc tải artifact app-debug từ tab [Actions](https://github.com/vukiengiang2025-sys/vudev-andee2/actions/workflows/build-apk.yml).
 - Bản tiếng Việt đầy đủ: [README.vi.md](README.vi.md)
 - English README: [README.en.md](README.en.md)
 - Hướng dẫn cài: [docs/INSTALL.md](docs/INSTALL.md) · Build: [docs/BUILD.md](docs/BUILD.md)

@@ -13,6 +13,7 @@ Những thay đổi của **bản fork VUDEV ANDEE 2** so với upstream **Andee
 
 ## Bảng tổng hợp
 
+
 | Hạng mục | Trạng thái | Bằng chứng |
 | --- | --- | --- |
 | Giao diện tiếng Việt mặc định | ✅ Đã commit | `4a66230`, `app/src/main/res/values-vi/` |

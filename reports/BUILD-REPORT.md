@@ -60,7 +60,14 @@ Workflow .github/workflows/build-apk.yml:
 - Không cần secret; không truyền khoá qua -P (build.gradle từ chối).
 - debug.keystore đã commit nên chữ ký APK giữa các lần chạy ổn định; workflow chỉ sinh keystore dự phòng khi tệp vắng mặt.
 
-## 6. Cài đặt
+## 6. Kết quả GitHub Actions
+
+- Workflow build-apk (nhánh main, run 43789075876): THÀNH CÔNG sau 4 phút 41 giây. Artifact app-debug (26.763.412 byte, nén zip) đã sẵn sàng để tải và cài từ xa.
+- Workflow build-apk cho tag v0.15.0-vudev2.1 (run 43789159733): THÀNH CÔNG; job debug APK và job release APK (unsigned) đều xanh, tạo thêm artifact app-release-unsigned.
+- Workflow build của upstream: sau commit cập nhật golden (dbddf13), run 43790692282 xanh cả hai job release-gate và debug-apk. Trước đó debug-apk đỏ vì 3 test golden chưa được cập nhật từ upstream 6255a4f (lỗi có sẵn).
+- Bản phát hành có APK tải trực tiếp: https://github.com/vukiengiang2025-sys/vudev-andee2/releases/tag/v0.15.0-vudev2.1
+
+## 7. Cài đặt
 
     adb install -r app/build/outputs/apk/debug/app-debug.apk
     adb shell am start -n net.kuafuai.andee/.ui.SelfCheckActivity

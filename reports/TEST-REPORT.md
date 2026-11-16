@@ -66,7 +66,15 @@ Kết quả: 336 tests completed, 16 failed.
 
 Nguyên nhân gốc chưa được sửa vì nằm ngoài phạm vi đợt này: nhóm test này chạy LocalBrain với HTTP server giả lập; kết quả cho thấy vòng lặp không nhận được phản hồi mong đợi. Tầng nhà cung cấp mới đã được kiểm chứng độc lập và không tham gia vào các test đó.
 
-### 3.3 Thiết bị thật
+### 3.3 Ứng dụng (app module)
+
+    ./gradlew :app:testDebugUnitTest
+
+Kết quả sau khi cập nhật golden snapshot: 90 test, 0 lỗi.
+
+Ba test GoldenTextTest đỏ ở trạng thái upstream vì snapshot chưa được cập nhật sau commit 6255a4f (thêm mục "Recorded flows" vào prompt và 260 dòng tool schema cho recorded flows). Đã tái tạo snapshot bằng đúng cơ chế cập nhật của test, xem diff: chỉ gồm phần prompt/tool của flows, không có thay đổi nào từ tầng nhà cung cấp của VUDEV. GoldenTextTest chạy lại 4/4 đạt; file tool_schemas_hub.json không đổi.
+
+### 3.4 Thiết bị thật
 
 Đầu phiên adb thấy thiết bị 25057RN09G (Redmi 15 5G), Android 16, arm64-v8a. Cuối phiên thiết bị mất kết nối USB, nên không cài và chạy APK trên máy được. Phương án thay thế: đẩy mã lên GitHub và tải APK từ artifact của workflow build-apk (chữ ký ổn định nhờ debug.keystore đã commit).
 
