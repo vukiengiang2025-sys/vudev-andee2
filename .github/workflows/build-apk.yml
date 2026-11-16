@@ -1,0 +1,177 @@
+# Builds the Android APK on a GitHub runner and publishes it as a downloadable
+# artifact, so producing a build no longer needs the phone (or any other
+# machine) connected to the developer's computer.
+#
+# Relationship to the existing `build.yml`: that file is a *gate* — it runs on
+# every push and PR and fails fast on a broken compile. This file is the
+# *pipeline*: it produces the files a person actually installs. The two overlap
+# on push/PR on purpose, because the debug job here is the one that attaches a
+# download; folding them together is a follow-up, not part of this change.
+#
+# This workflow runs without any credentials, and it does not need any: the
+# build bakes backend credentials in at package time from `local.properties`
+# (see the `buildConfigField` block in app/build.gradle). The CI copy carries
+# only `sdk.dir`, so an artifact built here is a plain build with the
+# repository's empty defaults. **Never pass a key with -P on the command
+# line** — the build's credential check rejects it.
+#
+# Toolchain, and why the pins are narrow: Gradle wrapper 9.3.1, AGP 8.3.1,
+# Kotlin 2.1.21, compileSdk 34. JDK 17 (temurin) is the one both Gradle 9 and
+# AGP 8.3 accept; raising the JDK without raising AGP breaks the build with an
+# error that never mentions Java.
+name: build-apk
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+# A second push to the same branch makes the first run pointless; cancel it.
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  debug-apk:
+    name: debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      # The committed gradlew is mode 100644, not executable, so a fresh
+      # checkout fails `./gradlew` with "Permission denied". Fixing the stored
+      # mode is a separate change to a file this workflow does not own; chmod
+      # here makes the run work either way.
+      - name: Make the Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install compileSdk 34 platform and build-tools
+        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
+
+      # The checkout has no SDK path; AGP refuses to configure without one.
+      # $ANDROID_HOME is exported by setup-android.
+      - name: Point Gradle at the runner's SDK
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      # app/build.gradle points the debug signing config at ${rootDir}/debug.keystore,
+      # and that file is not in the repository — a CI checkout would otherwise
+      # fail at `:app:packageDebug` with "Keystore file not found". Generate a
+      # throwaway one with the exact credentials the config expects (alias
+      # androiddebugkey, password "android" — the standard Android debug key).
+      # If the repository ever starts tracking its own debug.keystore, this step
+      # sees it and does nothing.
+      - name: Provide the debug keystore (standard Android debug key)
+        run: |
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair -noprompt \
+              -keystore debug.keystore \
+              -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      # The Gradle distribution plus every AGP/Kotlin artifact is roughly a
+      # gigabyte of downloads, so a warm cache is the difference between a
+      # three-minute and a twelve-minute run. Keyed on the version catalogs, so
+      # a version bump misses the cache instead of silently reusing stale ones.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # :core is plain JVM, so its tests need no emulator. Run them first: a
+      # logic failure is quicker to read than an APK that never got built.
+      - name: Unit tests (core)
+        run: ./gradlew -Dorg.gradle.jvmargs=-Xmx2g --max-workers=2 :core:test
+
+      # Heap and worker caps because the standard runner is not a build machine:
+      # the Kotlin daemon and R8 both grow, and the default 4 workers get the
+      # Gradle daemon OOM-killed mid-build. The daemon is left on (the default)
+      # because a cold daemonless run was measured to be much slower here.
+      - name: Assemble debug APK
+        run: ./gradlew -Dorg.gradle.jvmargs=-Xmx2g --max-workers=2 :app:assembleDebug
+
+      # The ABI splits produce one APK per ABI (arm64-v8a, armeabi-v7a,
+      # x86_64 — the glob picks up all of them). See the `splits` block in
+      # app/build.gradle. Debug APKs are signed with the repository's debug
+      # keystore, so they install directly.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  release-apk:
+    name: release APK (unsigned)
+    # Tags and manual runs only: a release build is a signing step away from
+    # being usable, so it should not run on every PR. There is no keystore in
+    # this repository, so `assembleRelease` emits **unsigned** APKs that cannot
+    # be installed or updated over the existing app — they are for whoever signs
+    # them with their own key afterwards. The build is still worth running: R8
+    # and `lintVitalRelease` only run here, so a broken keep rule is invisible
+    # to the debug job above.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      # The committed gradlew is mode 100644, not executable, so a fresh
+      # checkout fails `./gradlew` with "Permission denied". Fixing the stored
+      # mode is a separate change to a file this workflow does not own; chmod
+      # here makes the run work either way.
+      - name: Make the Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install compileSdk 34 platform and build-tools
+        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Point Gradle at the runner's SDK
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Assemble release APK (unsigned)
+        run: ./gradlew -Dorg.gradle.jvmargs=-Xmx2g --max-workers=2 :app:assembleRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-unsigned
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Name what was just uploaded
+        run: |
+          echo "These APKs are UNSIGNED and adb install will reject them."
+          echo "Sign them first: apksigner sign --ks <your-key.jks> <apk>"
