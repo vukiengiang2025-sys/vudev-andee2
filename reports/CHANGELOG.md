@@ -11,6 +11,15 @@ Những thay đổi của **bản fork VUDEV ANDEE 2** so với upstream **Andee
 
 ---
 
+## Sửa sau kiểm thử trên thiết bị thật (16/11/2026, chiều)
+
+- Cài đặt → Hệ thống AI: chỉ còn một khối backend hiển thị (trước đó cả ba khối cùng hiện khi đã có provider).
+- Trung tâm AI: key đang gõ không bị mất khi bấm "Kiểm tra kết nối".
+- Đồng bộ llm_* kiểu cũ vào record provider, và migrate key plaintext còn sót rồi xoá.
+- Tự kiểm tra: probe đúng theo từng nhà cung cấp, không in HTML lỗi thô; 501 được coi là "không có endpoint" và chuyển sang chat probe.
+- network_security_config: cho phép cleartext với localhost/127.0.0.1 và *.local (Ollama LAN dùng tên mDNS); các host khác vẫn HTTPS-only.
+- APK mới: 29.228.359 byte, SHA-256 81b58a26e51ac794dbf3ed331fa669e7663f04ecc4102c66a54b3e5abefa5fe1.
+
 ## Bảng tổng hợp
 
 

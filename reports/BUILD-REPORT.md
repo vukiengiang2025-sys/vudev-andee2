@@ -9,8 +9,8 @@ Ngày: 2026-11-16. Nền: commit 4a66230 (upstream + tiếng Việt) cùng các 
 | Kết quả | BUILD SUCCESSFUL |
 | Task | :app:assembleDebug |
 | Tệp APK | app/build/outputs/apk/debug/app-debug.apk |
-| Kích thước | 28.605.631 byte (~27,3 MiB) |
-| SHA-256 | 46e45533bd291dde3c800c06c7f22c2306d4c244577b1f1453aaefe21ff95d8c |
+| Kích thước | 29.228.359 byte (~27,9 MiB) |
+| SHA-256 | 81b58a26e51ac794dbf3ed331fa669e7663f04ecc4102c66a54b3e5abefa5fe1 |
 | Package | net.kuafuai.andee |
 | versionName / versionCode | 0.15.0 / 30 (giữ số của upstream; nhận diện bản build bằng commit) |
 | minSdk / targetSdk / compileSdk | 27 / 34 / 34 |

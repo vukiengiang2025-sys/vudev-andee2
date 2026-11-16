@@ -12,4 +12,14 @@
          exception for a host nobody calls only widens what the app will talk
          to in the clear. A build pointed at a plain-HTTP backend has to name
          that host here (and in the debug copy). -->
+    <!-- Loopback and mDNS names are the two places a local model is reached without TLS: Ollama on
+         the same machine (adb reverse / 127.0.0.1) and Ollama on the LAN addressed as hostname.local.
+         Android cannot name an IP range, so a LAN server addressed as 192.168.x.y is deliberately not
+         allowed here: either give it a mDNS name (Ollama's default macOS/Linux install answers as
+         <host>.local) or put it behind HTTPS. Everything else stays HTTPS-only. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="true">local</domain>
+    </domain-config>
 </network-security-config>

@@ -93,6 +93,33 @@ Chưa kiểm chứng trên máy thật: bóng nổi, quyền Accessibility, micr
 | Chuỗi đa ngôn ngữ | zh 1017, en 1017, vi 1017 |
 | Cảnh báo biên dịch | 38 cảnh báo, đều là API deprecated có sẵn, không có lỗi |
 
+## 4b. Kiểm thử trên thiết bị thật — Redmi 15 5G (25057RN09G), Android 16
+
+Ngày 2026-11-16 buổi chiều, sau khi điện thoại được nối lại vào máy tính.
+
+Đã thực hiện:
+- Cài app-debug.apk (chữ ký debug của kho), mở app: onboarding và màn hình Tự kiểm tra hiển thị tiếng Việt đúng, không crash.
+- Cấp quyền qua adb: RECORD_AUDIO, POST_NOTIFICATIONS, CAMERA, WRITE_SECURE_SETTINGS; SYSTEM_ALERT_WINDOW = allow; bật AccessibilityService (kèm hộp thoại cảnh báo của HyperOS).
+- Trung tâm AI mở từ Cài đặt, sửa nhà cung cấp DeepSeek thành endpoint giả lập trên máy tính qua adb reverse: base http://127.0.0.1:8088/v1, model mock-model, key test.
+- Bấm "Kiểm tra kết nối": hiện "Kết nối OK sau 81 ms · mock-model"; server giả lập nhận đúng POST /v1/chat/completions với Authorization: Bearer <key test> và model mock-model.
+- Bấm Lưu: danh sách hiện "DeepSeek · mock-model" và "Đã lưu API key". shared_prefs/andee_ai.xml chứa key dạng v1:<ciphertext>; shared_prefs/voice_prefs.xml không còn llm_api_key dạng rõ.
+- Não dựng lại: log "brain=local ... model=mock-model @ http://127.0.0.1:8088/v1 ... key=set".
+- Một lượt hội thoại qua WebSocket debug.say (loopback qua adb forward): não gọi LLM giả lập 1 lần, "step 1: 0 tool call(s)", câu trả lời được lưu vào files/chat_history.json.
+- Một lượt có tool: "kiểm tra trạng thái thiết bị" → "step 1: 1 tool call(s)", gọi LLM lần 2 → "step 2: 0 tool call(s)" và câu trả lời cuối vào chat_history.json.
+- Sau khi sửa probe: hàng "Kết nối mô hình" trong Tự kiểm tra biến mất, tiêu đề chuyển "Đã dùng được · Còn 5 mục nên bật thêm".
+
+Lỗi phát hiện khi chạy trên máy và đã sửa trong đợt này:
+1. Cài đặt → Hệ thống AI hiển thị đồng thời cả ba khối (Cục bộ / Hub / CodeFlying) khi đã có provider, vì khối ẩn/hiện nằm trong nhánh "chưa có provider".
+2. Key vừa nhập bị mất sau khi bấm "Kiểm tra kết nối" (form được dựng lại) → thêm draftKey giữ key đang gõ qua các lần dựng lại.
+3. Màn hình cấu hình não lần đầu ghi llm_* kiểu cũ nhưng ProviderStore đã seed trước đó nên key không đến não → thêm hook applyLegacy.
+4. Key cũ dạng plaintext còn sót trong voice_prefs khi store đã có record → tự migrate vào record rồi xoá bản rõ.
+5. Tự kiểm tra gọi GET /models và in nguyên trang HTML 501 ra UI; với Gemini/Anthropic lại chấm theo chuẩn OpenAI → probe theo đúng provider, coi 501 như "không có endpoint" và chỉ hiện mã lỗi/tin nhắn.
+6. Cấu hình mạng chỉ cho phép cleartext với loopback; bổ sung localhost/127.0.0.1 và *.local để Ollama trong LAN (tên mDNS) dùng được ở bản release.
+
+Ghi chú HyperOS: cập nhật APK hoặc force-stop ứng dụng làm MIUI tắt AccessibilityService; phải bật lại trong Cài đặt → Hỗ trợ tiếp cận → Andee.
+
+Chưa kiểm thử trên máy: giọng nói/ASR/TTS thật, camera, điều khiển màn hình bằng tool, hub LAN, khôi phục sau khởi động lại. Không gọi API thật của DeepSeek/OpenAI/Gemini/Anthropic để tránh phát sinh chi phí; key thật của người dùng đã được khôi phục và mã hoá lại sau khi test.
+
 ## 5. Hạn chế
 
 1. Không gọi API thật của các nhà cung cấp vì không có key người dùng trong môi trường; adapter được kiểm bằng mock server.

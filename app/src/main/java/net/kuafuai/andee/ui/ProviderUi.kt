@@ -66,6 +66,13 @@ class ProviderUi(
 
     /** The live result of "test connection", drawn in the editor. */
     private var testText = ""
+
+    /**
+     * A key typed but not yet saved. Kept across a rebuild because "test connection" rebuilds the form:
+     * without this the key disappears the moment it is tested, and saving then stores nothing. Never
+     * printed back as text — the field shows dots.
+     */
+    private var draftKey: String? = null
     private var testOk = false
     @Volatile private var testing = false
 
@@ -224,7 +231,7 @@ class ProviderUi(
                 setPadding(0, dp(10), 0, 0)
             }
             actionRow.addView(smallButton(lctx.getString(R.string.provider_edit)) {
-                adding = false; editing = e; testText = ""; rebuild()
+                adding = false; editing = e; testText = ""; draftKey = null; rebuild()
             }, LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginEnd = dp(6) })
             if (e.id != activeId) actionRow.addView(smallButton(lctx.getString(R.string.provider_use)) {
                 ProviderStore.setActive(context, e.id); changed()
@@ -463,7 +470,7 @@ class ProviderUi(
             .ifEmpty { provider.label }
         val base = fields["base_url"]?.text?.toString()?.trim().orEmpty()
         val model = fields["model"]?.text?.toString()?.trim().orEmpty()
-        val key = fields["api_key"]?.text?.toString()?.trim().orEmpty()
+        val key = fields["api_key"]?.text?.toString()?.trim().orEmpty().ifEmpty { draftKey.orEmpty() }
         if (provider.needsKey && key.isBlank() && !e.hasKey) {
             testText = lctx.getString(R.string.provider_err_need_key)
             testOk = false
@@ -500,9 +507,9 @@ class ProviderUi(
     private fun runTest() {
         val e = editing ?: return
         val provider = ProviderProviders.current() ?: e.provider
-        val key = fields["api_key"]?.text?.toString()?.trim().orEmpty().ifEmpty {
-            ProviderStore.keyOf(e)
-        }
+        val key = fields["api_key"]?.text?.toString()?.trim().orEmpty()
+            .ifEmpty { draftKey.orEmpty() }
+            .ifEmpty { ProviderStore.keyOf(e) }
         val probe = e.copy(
             providerId = provider.id,
             label = fields["label"]?.text?.toString()?.trim().orEmpty().ifEmpty { provider.label },
@@ -537,6 +544,7 @@ class ProviderUi(
     private fun snapshot() {
         val e = editing ?: return
         if (fields.isEmpty()) return
+        fields["api_key"]?.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { draftKey = it }
         editing = e.copy(
             label = fields["label"]?.text?.toString()?.trim() ?: e.label,
             baseUrl = fields["base_url"]?.text?.toString()?.trim() ?: e.baseUrl,
@@ -554,6 +562,7 @@ class ProviderUi(
         adding = false
         roleEditing = null
         testText = ""
+        draftKey = null
         onChanged()
         rebuild()
     }
@@ -650,7 +659,7 @@ class ProviderUi(
             "label" -> editing?.label.orEmpty()
             "base_url" -> editing?.baseUrl.orEmpty()
             "model" -> editing?.model.orEmpty()
-            "api_key" -> ""
+            "api_key" -> draftKey.orEmpty()
             "temperature" -> editing?.temperature?.toString().orEmpty()
             "top_p" -> editing?.topP?.toString().orEmpty()
             "max_tokens" -> editing?.maxOutputTokens?.toString().orEmpty()

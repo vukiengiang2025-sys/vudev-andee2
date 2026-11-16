@@ -88,7 +88,14 @@ object ProviderStore {
     @Synchronized
     fun seedIfNeeded(context: Context) {
         val root = state(context)
-        if (root.optJSONArray("providers")?.length() ?: 0 > 0) return
+        if (root.optJSONArray("providers")?.length() ?: 0 > 0) {
+            // A device that already has records can still carry a plain-text llm_api_key written before
+            // the encryption change (or by a first-run flow that ran while the store existed). Seal it
+            // into the active record if that record has no key, then delete the readable copy — a key
+            // left in voice_prefs is exactly what this store exists to prevent.
+            migratePlainLegacyKey(context, root)
+            return
+        }
         val p = context.getSharedPreferences(VOICE_PREFS, Context.MODE_PRIVATE)
         val legacyKey = p.getString("llm_api_key", "").orEmpty().trim()
         val legacyBase = p.getString("llm_base_url", "").orEmpty().trim()
@@ -117,6 +124,66 @@ object ProviderStore {
 
     private fun newId(): String = "p_" + System.currentTimeMillis().toString(36) + "_" +
         UUID.randomUUID().toString().take(6)
+
+    /** Seal a legacy plain-text key into the active record when it has none, then remove the plain copy. */
+    private fun migratePlainLegacyKey(context: Context, root: JSONObject) {
+        val p = context.getSharedPreferences(VOICE_PREFS, Context.MODE_PRIVATE)
+        val plain = p.getString("llm_api_key", "").orEmpty().trim()
+        if (plain.isEmpty()) return
+        val arr = root.optJSONArray("providers") ?: return
+        val activeId = root.optString("active")
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (o.optString("id") != activeId) continue
+            if (o.optString("key").isBlank()) {
+                o.put("key", SecretBox.seal(plain).orEmpty())
+                write(context, root)
+            }
+            break
+        }
+        // Whether or not it was adopted, the readable copy goes: the record's sealed key is what the
+        // brain uses from here on.
+        p.edit().remove("llm_api_key").apply()
+    }
+
+    /**
+     * Mirror a legacy llm_* write (the first-run brain setup and the old settings rows) into the active
+     * record.
+     *
+     * Without this the store is seeded once at first brain start and then silently shadows every later
+     * legacy write — which is exactly the first-run flow: the service starts (creating a keyless record),
+     * the user types a key in the setup card, and the brain keeps saying the key is missing. The legacy
+     * plain-text key is deleted after it is sealed.
+     */
+    fun applyLegacy(context: Context, updates: Map<String, String>) {
+        val keys = setOf("llm_api_key", "llm_base_url", "llm_model", "llm_thinking", "llm_reasoning_effort")
+        if (updates.keys.none { it in keys }) return
+        seedIfNeeded(context)
+        val active = active(context) ?: return
+        val base = updates["llm_base_url"]?.trim() ?: active.baseUrl
+        val model = updates["llm_model"]?.trim() ?: active.model
+        val thinking = updates["llm_thinking"]?.let { it.trim().lowercase() != "disabled" } ?: active.thinking
+        val effort = updates["llm_reasoning_effort"]?.trim()?.ifEmpty { null } ?: active.reasoningEffort
+        val provider = AiProviders.match(base.ifBlank { active.resolvedBaseUrl })
+        val plainKey = updates["llm_api_key"]?.trim()?.ifEmpty { null }
+        save(
+            context,
+            active.copy(
+                providerId = provider.id,
+                baseUrl = base,
+                model = model,
+                thinking = thinking,
+                reasoningEffort = effort,
+            ),
+            plainKey,
+        )
+        // The key now lives sealed in the provider record; a readable copy in voice_prefs is the thing
+        // this store exists to prevent.
+        if (plainKey != null) {
+            context.getSharedPreferences(VOICE_PREFS, Context.MODE_PRIVATE).edit()
+                .remove("llm_api_key").apply()
+        }
+    }
 
     // ---- reading -------------------------------------------------------------------------------------
 

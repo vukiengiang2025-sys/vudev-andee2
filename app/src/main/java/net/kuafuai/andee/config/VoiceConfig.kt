@@ -691,6 +691,10 @@ object VoiceConfig {
                 }
             }
             p.apply()
+            // Keep the AI Provider Center's active record in step with the legacy llm_* rows: the
+            // first-run setup card writes these fields, and the store is the source of truth for the
+            // brain. See ProviderStore.applyLegacy.
+            ProviderStore.applyLegacy(context, updates)
         }
 
         /** What [SettingsUi] shows. Only the keys it can actually edit. */

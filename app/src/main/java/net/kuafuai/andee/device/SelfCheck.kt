@@ -459,7 +459,7 @@ object SelfCheck {
                 else R.string.check_detail_skipped_offline,
             )
         }
-        return when (val r = probeBackend(bc.baseUrl, bc.apiKey, bc.model)) {
+        return when (val r = probeBackend(bc)) {
             is Reach.Ok -> Finding(
                 id = "backend",
                 title = R.string.check_title_model,
@@ -1273,7 +1273,17 @@ object SelfCheck {
      * off. All three misconfigurations are decided by validation, before any
      * generation happens, so there is nothing to learn from letting it write.
      */
-    private fun probeBackend(baseUrl: String, apiKey: String, model: String): Reach {
+    private fun probeBackend(cfg: net.kuafuai.andee.config.BrainConfig): Reach {
+        val baseUrl = cfg.baseUrl
+        val apiKey = cfg.apiKey
+        val model = cfg.model
+        val provider = net.kuafuai.andee.brain.provider.AiProviders.providerFor(cfg.providerId, baseUrl)
+        // Gemini and Anthropic do not speak GET /models + OpenAI-shaped chat: probing them with this
+        // OpenAI probe used to report a made-up URL/key/model problem for a perfectly healthy provider.
+        // Their check is one tiny real request through the same adapter the brain uses.
+        if (provider.wire != net.kuafuai.andee.brain.provider.WireFormat.OPENAI) {
+            return probeWithProvider(cfg, provider)
+        }
         val http = OkHttpClient.Builder()
             .connectTimeout(PROBE_CONNECT_S, TimeUnit.SECONDS)
             .readTimeout(PROBE_READ_S, TimeUnit.SECONDS)
@@ -1304,12 +1314,13 @@ object SelfCheck {
                     // No such endpoint on this gateway: not an error in the
                     // user's config, just a gateway shaped differently. Fall
                     // through to the chat probe.
-                    resp.code == 404 || resp.code == 405 -> null
+                    // No such endpoint on this gateway: not an error in the user's config, just a gateway
+                    // shaped differently. 501 is the same situation for a server that has no GET handler
+                    // (a minimal OpenAI-compatible endpoint) — fall through to the chat probe instead of
+                    // printing its HTML error page at the user.
+                    resp.code == 404 || resp.code == 405 || resp.code == 501 -> null
 
-                    else -> return Reach.Bad(
-                        Kind.OTHER,
-                        "HTTP ${resp.code}: ${resp.body?.string().orEmpty().take(200)}",
-                    )
+                    else -> return Reach.Bad(Kind.OTHER, "HTTP ${resp.code}" + shortReason(resp.body?.string().orEmpty()))
                 }
             }
         } catch (e: Exception) {
@@ -1355,13 +1366,67 @@ object SelfCheck {
                     resp.code == 429 -> Reach.Throttled
                     // 400 is what a bad model name comes back as, and the body
                     // is where the gateway says which part of it it disliked.
-                    else -> Reach.Bad(
-                        Kind.MODEL,
-                        "HTTP ${resp.code}: ${resp.body?.string().orEmpty().take(200)}",
-                    )
+                    else -> Reach.Bad(Kind.MODEL, "HTTP ${resp.code}" + shortReason(resp.body?.string().orEmpty()))
                 }
             }
         } catch (e: IOException) {
+            Reach.Bad(Kind.URL, e.message ?: e.javaClass.simpleName)
+        }
+    }
+
+    /**
+     * The gateway's own words, only when they are words: an HTML error page or an empty body is reduced
+     * to the status code rather than pasted into a Vietnamese checklist row.
+     */
+    private fun shortReason(body: String): String {
+        val raw = body.trim()
+        if (raw.isEmpty() || raw.startsWith("<")) return ""
+        val msg = runCatching {
+            val e = JSONObject(raw).opt("error")
+            when (e) {
+                is JSONObject -> e.optString("message")
+                is String -> e
+                else -> ""
+            }
+        }.getOrNull().orEmpty().ifBlank { raw }
+        return ": " + msg.replace(Regex("\\s+"), " ").take(160)
+    }
+
+    /**
+     * A real (but tiny) request through the provider's own adapter, for providers whose list endpoint is
+     * not the OpenAI one. maxOutputTokens = 1 and thinking off keep it as cheap as a probe can be.
+     */
+    private fun probeWithProvider(
+        cfg: net.kuafuai.andee.config.BrainConfig,
+        provider: net.kuafuai.andee.brain.provider.AiProvider,
+    ): Reach {
+        val ep = net.kuafuai.andee.brain.provider.ProviderEndpoint(
+            providerId = provider.id,
+            baseUrl = cfg.baseUrl,
+            model = cfg.model,
+            apiKey = cfg.apiKey,
+            thinking = false,
+            reasoningEffort = "low",
+            maxOutputTokens = 1,
+            timeoutSeconds = PROBE_READ_S,
+            maxRetries = 0,
+        )
+        return try {
+            ep.client(timeoutSeconds = PROBE_READ_S).complete(
+                listOf(JSONObject().put("role", "user").put("content", "hi")),
+                JSONArray(),
+                noThinking = true,
+            )
+            Reach.Ok
+        } catch (e: net.kuafuai.andee.brain.LlmHttpException) {
+            when (e.code) {
+                401, 403 -> Reach.Bad(Kind.KEY, "HTTP ${e.code}")
+                402 -> Reach.Bad(Kind.BALANCE, "HTTP 402")
+                429 -> Reach.Throttled
+                in 500..599 -> Reach.Bad(Kind.OTHER, "HTTP ${e.code}")
+                else -> Reach.Bad(Kind.MODEL, "HTTP ${e.code}" + shortReason(e.body))
+            }
+        } catch (e: Exception) {
             Reach.Bad(Kind.URL, e.message ?: e.javaClass.simpleName)
         }
     }

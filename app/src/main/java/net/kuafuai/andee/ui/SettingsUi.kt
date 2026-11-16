@@ -763,6 +763,12 @@ class SettingsUi(
             }, rowParams(10))
             note(localBlock, lctx.getString(R.string.provider_managed_note))
         }
+        // Declared outside the branch because the visibility flip at the end of this section runs for
+        // every device; when a provider record exists the legacy rows are not built, and a flip that only
+        // existed inside the branch left every tab of the back-end picker visible at once.
+        var applyThinking: ((String, Boolean) -> Unit)? = null
+        var thinking = "disabled"
+        var effortBlock: LinearLayout? = null
         if (activeProvider == null) {
         // The hint *is* the value a blank row resolves to, so the hint and the
         // resolved config come from the same language-aware pair — see
@@ -798,17 +804,17 @@ class SettingsUi(
         )
 
         rowLabel(localBlock, lctx.getString(R.string.settings_llm_thinking))
-        var applyThinking: ((String, Boolean) -> Unit)? = null
-        val thinking = segmented(
+        thinking = segmented(
             localBlock,
             "llm_thinking",
             listOf("enabled" to lctx.getString(R.string.common_on), "disabled" to lctx.getString(R.string.common_off)),
         ) { applyThinking?.invoke(it, true) }
 
-        val effortBlock = block(localBlock)
-        rowLabel(effortBlock, lctx.getString(R.string.settings_llm_effort))
+        val eb = block(localBlock)
+        effortBlock = eb
+        rowLabel(eb, lctx.getString(R.string.settings_llm_effort))
         segmented(
-            effortBlock,
+            eb,
             "llm_reasoning_effort",
             listOf(
                 "high" to lctx.getString(R.string.common_high),
@@ -817,6 +823,7 @@ class SettingsUi(
             ),
         )
         note(localBlock, lctx.getString(R.string.settings_brain_local_note))
+        } // end of the legacy rows: a configured provider replaces them
 
         // ---- Which service hears and speaks ----
         //
@@ -1006,10 +1013,9 @@ class SettingsUi(
         }
         applyMode(mode, false)
         applyThinking = { th, animate ->
-            Glass.setVisible(effortBlock, th != "disabled", animate)
+            effortBlock?.let { Glass.setVisible(it, th != "disabled", animate) }
         }
         applyThinking(thinking, false)
-        }
     }
 
     /**
