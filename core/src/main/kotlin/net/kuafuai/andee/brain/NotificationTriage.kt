@@ -57,6 +57,9 @@ class NotificationTriage(
         // See the class KDoc: a classification does not think.
         thinking = false,
         reasoningEffort = cfg.reasoningEffort,
+        providerId = cfg.providerId,
+        maxOutputTokens = cfg.maxOutputTokens,
+        maxRetries = cfg.maxRetries,
         // ~500 tokens in, one line out. On the phone this runs inside a wake lock with a deadline
         // (NotificationRelayService.KeepAwake), and the call has to end before the lock does; a triage that
         // has not answered in this long is a failed one, which falls back to the signboard.

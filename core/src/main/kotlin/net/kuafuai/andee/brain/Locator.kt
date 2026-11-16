@@ -34,7 +34,16 @@ class Locator(cfg: BrainConfig, private val model: String, private val log: (war
     }
 
     private val key = cfg.baseUrl
-    private val llm = LlmClient(baseUrl = cfg.baseUrl, apiKey = cfg.apiKey, model = model, thinking = false, reasoningEffort = "low")
+    private val llm = LlmClient(
+        baseUrl = cfg.baseUrl,
+        apiKey = cfg.apiKey,
+        model = model,
+        thinking = false,
+        reasoningEffort = "low",
+        providerId = cfg.providerId,
+        maxOutputTokens = cfg.maxOutputTokens,
+        maxRetries = cfg.maxRetries,
+    )
 
     /** Blocks for one model call (~2 s). [pngBase64] is the screenshot exactly as captured, no grid on it. */
     fun locate(pngBase64: String, target: String): Result {

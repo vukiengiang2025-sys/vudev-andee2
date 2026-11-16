@@ -35,6 +35,11 @@ class PlanMind(
         model = cfg.model,
         thinking = false,
         reasoningEffort = cfg.reasoningEffort,
+        providerId = cfg.providerId,
+        temperature = cfg.temperature,
+        topP = cfg.topP,
+        maxOutputTokens = cfg.maxOutputTokens,
+        maxRetries = cfg.maxRetries,
     )
 
     /**

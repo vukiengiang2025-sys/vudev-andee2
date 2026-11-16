@@ -16,6 +16,24 @@ data class BrainConfig(
     val model: String,
     val thinking: Boolean,
     val reasoningEffort: String,
+    /**
+     * Which provider [baseUrl] belongs to (the AI Provider Center's id). Blank on settings written before
+     * providers had a name: the client then works it out from the URL, which is exactly what the app did
+     * when DeepSeek was the only option.
+     */
+    val providerId: String = "",
+    /** Optional generation parameters; null means "the provider's default", which is not the same as 0. */
+    val temperature: Double? = null,
+    val topP: Double? = null,
+    val maxOutputTokens: Int? = null,
+    /** How long one request may take, and how many transient failures are retried on the same endpoint. */
+    val readTimeoutSeconds: Long = 180,
+    val maxRetries: Int = 1,
+    /**
+     * The endpoint to fall back to when the primary fails in a way another provider can route around. Null
+     * on a device that configured only one provider, which is the common case.
+     */
+    val fallback: net.kuafuai.andee.brain.provider.ProviderEndpoint? = null,
 ) {
     /**
      * The agent loop runs on this device (local DeepSeek or CodeFlying
@@ -33,7 +51,10 @@ data class BrainConfig(
      * is what discards the conversation.
      */
     fun sameBackend(other: BrainConfig): Boolean =
-        mode == other.mode && apiKey == other.apiKey && baseUrl == other.baseUrl
+        mode == other.mode && apiKey == other.apiKey && baseUrl == other.baseUrl &&
+            providerId == other.providerId &&
+            (fallback == null) == (other.fallback == null) &&
+            (fallback == null || fallback.sameBackend(other.fallback!!))
 
     companion object {
         const val BRAIN_HUB = "hub"

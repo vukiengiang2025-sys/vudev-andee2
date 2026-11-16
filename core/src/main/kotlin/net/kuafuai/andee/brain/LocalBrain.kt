@@ -112,6 +112,15 @@ class LocalBrain(
         model = cfg.model,
         thinking = cfg.thinking,
         reasoningEffort = cfg.reasoningEffort,
+        readTimeoutSeconds = cfg.readTimeoutSeconds,
+        providerId = cfg.providerId,
+        temperature = cfg.temperature,
+        topP = cfg.topP,
+        maxOutputTokens = cfg.maxOutputTokens,
+        maxRetries = cfg.maxRetries,
+        // The fallback is built from the endpoint the settings handed over, not from cfg's own fields: it is
+        // a different provider with a different key, and it is only ever asked once (see LlmClient.complete).
+        fallback = cfg.fallback?.client(),
     )
 
     /**
